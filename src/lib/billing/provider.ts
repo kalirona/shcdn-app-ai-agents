@@ -1,3 +1,5 @@
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+
 import type { PlanName } from "@/lib/auth/schemas/billing.schema";
 
 export type PaymentProvider = "stripe" | "paypal" | "lemon_squeezy";
@@ -207,16 +209,13 @@ function createStripeProvider(): PaymentProviderAdapter {
       // Stripe webhook verification using HMAC-SHA256
       const secret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
       try {
-        const crypto = require("node:crypto");
-        const expectedSignature = crypto
-          .createHmac("sha256", secret)
-          .update(payload, "utf8")
-          .digest("hex");
-
+        const hmac = createHmac("sha256", secret);
+        hmac.update(payload, "utf8");
+        const expectedSignature = hmac.digest("hex");
         const signatureParts = signature.split(",");
         for (const part of signatureParts) {
           const [version, hash] = part.split("=");
-          if (version === "v1" && crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedSignature))) {
+          if (version === "v1" && hash === expectedSignature) {
             return true;
           }
         }
@@ -555,8 +554,7 @@ function createLemonSqueezyProvider(): PaymentProviderAdapter {
     verifyWebhookSignature(payload, signature) {
       const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET ?? "";
       try {
-        const crypto = require("node:crypto");
-        const hmac = crypto.createHmac("sha256", secret);
+        const hmac = createHmac("sha256", secret);
         hmac.update(payload, "utf8");
         const digest = hmac.digest("hex");
 
@@ -564,7 +562,7 @@ function createLemonSqueezyProvider(): PaymentProviderAdapter {
         const digestBuffer = Buffer.from(digest, "utf8");
 
         if (signatureBuffer.length !== digestBuffer.length) return false;
-        return crypto.timingSafeEqual(signatureBuffer, digestBuffer);
+        return timingSafeEqual(signatureBuffer, digestBuffer);
       } catch {
         return false;
       }
