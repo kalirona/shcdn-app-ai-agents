@@ -5,8 +5,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "9000:3000"
+    # Port mapping handled by Dokploy reverse proxy
+    # No need to expose ports manually
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
