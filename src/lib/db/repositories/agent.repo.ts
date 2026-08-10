@@ -10,6 +10,10 @@ export interface CreateAgentParams {
   language?: string;
   greeting?: string;
   fallbackMessage?: string;
+  purpose?: string;
+  primaryGoal?: string;
+  secondaryGoal?: string;
+  fallbackAction?: string;
 }
 
 export async function createAgent(params: CreateAgentParams): Promise<AgentEntity> {
@@ -24,6 +28,10 @@ export async function createAgent(params: CreateAgentParams): Promise<AgentEntit
     greeting: params.greeting ?? "Hello! How can I help you today?",
     fallback_message:
       params.fallbackMessage ?? "I'm not sure about that. Let me connect you with someone who can help.",
+    purpose: params.purpose ?? "custom",
+    primary_goal: params.primaryGoal ?? "answer_questions",
+    secondary_goal: params.secondaryGoal ?? "",
+    fallback_action: params.fallbackAction ?? "transfer_human",
   });
 }
 

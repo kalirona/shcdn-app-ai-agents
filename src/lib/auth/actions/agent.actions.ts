@@ -39,6 +39,10 @@ export async function createAgent(workspaceId: string, data: z.infer<typeof crea
         language: parsed.data.language,
         greeting: parsed.data.greeting,
         fallback_message: parsed.data.fallbackMessage,
+        purpose: parsed.data.purpose,
+        primary_goal: parsed.data.primaryGoal,
+        secondary_goal: parsed.data.secondaryGoal,
+        fallback_action: parsed.data.fallbackAction,
       });
     } else {
       const agentRepo = await import("@/lib/db/repositories/agent.repo");
@@ -51,6 +55,10 @@ export async function createAgent(workspaceId: string, data: z.infer<typeof crea
         fallbackMessage: parsed.data.fallbackMessage,
         language: parsed.data.language,
         systemPrompt: parsed.data.systemInstructions || defaultSystemPrompt(parsed.data.name, parsed.data.tone),
+        purpose: parsed.data.purpose,
+        primaryGoal: parsed.data.primaryGoal,
+        secondaryGoal: parsed.data.secondaryGoal,
+        fallbackAction: parsed.data.fallbackAction,
       });
     }
 

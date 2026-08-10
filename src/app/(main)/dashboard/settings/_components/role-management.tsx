@@ -26,8 +26,9 @@ import {
 import {
   ROLE_DESCRIPTIONS,
   ROLE_LABELS,
-  canManageRole,
-  getAssignableRoles,
+  hasPermission,
+  PERMISSIONS,
+  ROLES,
   type Role,
 } from "@/lib/auth/roles";
 
@@ -55,7 +56,7 @@ function getMembers(): Member[] {
       id: "dev-user-123",
       name: "Dev User",
       email: "dev@localhost.com",
-      role: "owner" as Role,
+      role: ROLES.OWNER,
       joinedAt: new Date().toISOString(),
     },
   ];
@@ -68,13 +69,19 @@ function saveMembers(members: Member[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
 }
 
+function getAssignableRoles(role: Role): Role[] {
+  if (role === ROLES.OWNER) return [ROLES.ADMIN, ROLES.MEMBER];
+  if (role === ROLES.ADMIN) return [ROLES.MEMBER];
+  return [];
+}
+
 export function RoleManagement() {
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<Role>("member");
-  const currentUserRole: Role = "owner";
+  const [inviteRole, setInviteRole] = useState<Role>(ROLES.MEMBER);
+  const currentUserRole: Role = ROLES.OWNER;
 
   useEffect(() => {
     setMembers(getMembers());
@@ -97,12 +104,16 @@ export function RoleManagement() {
     setMembers(updated);
     saveMembers(updated);
     setInviteEmail("");
-    setInviteRole("member");
+    setInviteRole(ROLES.MEMBER);
     setInviteOpen(false);
     toast.success(`Invitation sent to ${inviteEmail}`);
   }
 
   function handleRoleChange(memberId: string, newRole: Role) {
+    if (!hasPermission(currentUserRole, PERMISSIONS.MEMBERS_CHANGE_ROLE)) {
+      toast.error("You don't have permission to change roles.");
+      return;
+    }
     const updated = members.map((m) =>
       m.id === memberId ? { ...m, role: newRole } : m,
     );
@@ -137,7 +148,7 @@ export function RoleManagement() {
             Manage who has access to this workspace.
           </p>
         </div>
-        {canManageRole(currentUserRole, "member") && (
+        {hasPermission(currentUserRole, PERMISSIONS.MEMBERS_INVITE) && (
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
               <Button size="sm">
@@ -221,7 +232,7 @@ export function RoleManagement() {
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  {canManageRole(currentUserRole, member.role) && member.id !== "dev-user-123" ? (
+                  {hasPermission(currentUserRole, PERMISSIONS.MEMBERS_CHANGE_ROLE) && member.id !== "dev-user-123" ? (
                     <Select
                       value={member.role}
                       onValueChange={(v) => handleRoleChange(member.id, v as Role)}
@@ -248,7 +259,7 @@ export function RoleManagement() {
                   {new Date(member.joinedAt).toLocaleDateString()}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {canManageRole(currentUserRole, member.role) && member.id !== "dev-user-123" && (
+                  {hasPermission(currentUserRole, PERMISSIONS.MEMBERS_REMOVE) && member.id !== "dev-user-123" && (
                     <Button
                       variant="ghost"
                       size="icon"

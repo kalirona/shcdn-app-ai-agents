@@ -34,6 +34,10 @@ export interface AgentEntity {
   status: "draft" | "active" | "paused";
   date_created: string;
   date_updated: string;
+  purpose: string;
+  primary_goal: string;
+  secondary_goal: string;
+  fallback_action: string;
 }
 
 export interface KnowledgeSourceEntity {

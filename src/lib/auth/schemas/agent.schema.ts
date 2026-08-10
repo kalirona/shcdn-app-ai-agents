@@ -22,6 +22,10 @@ export const createAgentSchema = z.object({
     .max(2000, "Instructions must be 2000 characters or less.")
     .optional()
     .or(z.literal("")),
+  purpose: z.string().optional().default("custom"),
+  primaryGoal: z.string().optional().default("answer_questions"),
+  secondaryGoal: z.string().optional().default(""),
+  fallbackAction: z.string().optional().default("transfer_human"),
 });
 
 export const updateAgentSchema = z.object({
