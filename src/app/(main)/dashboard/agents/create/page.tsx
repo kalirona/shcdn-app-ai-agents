@@ -12,6 +12,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { AgentEntity } from "@/lib/db/entities";
+import {
+  AGENT_BEHAVIORS,
+  AGENT_BEHAVIOR_LABELS,
+  AGENT_BEHAVIOR_DESCRIPTIONS,
+  TOOLS,
+  TOOL_LABELS,
+  TOOL_CATEGORIES,
+  getToolsForBehaviors,
+} from "@/lib/auth/agent-config";
 import { saveAgentToStorage } from "@/lib/db/storage-helper";
 
 const AGENT_PURPOSES = [
@@ -108,11 +117,16 @@ export default function CreateAgentWizard() {
   );
   const [instructions, setInstructions] = useState("");
   const [tone, setTone] = useState("professional");
+  const [behaviors, setBehaviors] = useState<string[]>([
+    AGENT_BEHAVIORS.ANSWER_QUESTIONS,
+    AGENT_BEHAVIORS.HUMAN_HANDOFF,
+  ]);
   const [error, setError] = useState<string | null>(null);
 
   const canProceedStep1 = name.trim().length >= 2;
   const canProceedStep2 = true;
   const canProceedStep3 = greeting.trim().length > 0 && fallbackMessage.trim().length > 0;
+  const canProceedStep4 = behaviors.length > 0;
 
   function handlePurposeChange(purposeId: string) {
     setPurpose(purposeId);
@@ -190,6 +204,8 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
         primary_goal: primaryGoal,
         secondary_goal: secondaryGoal,
         fallback_action: fallbackAction,
+        behaviors,
+        allowed_tools: getToolsForBehaviors(behaviors as any),
       };
 
       saveAgentToStorage(agent);
@@ -211,7 +227,7 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
         </Button>
         <h1 className="font-semibold text-2xl tracking-tight">Create AI Agent</h1>
         <p className="text-muted-foreground">
-          Step {step} of 3 — {step === 1 ? "What should it do?" : step === 2 ? "Goals & behavior" : "Test & publish"}
+          Step {step} of 4 — {step === 1 ? "What should it do?" : step === 2 ? "Goals & behavior" : step === 3 ? "Capabilities & tools" : "Review & publish"}
         </p>
       </div>
 
@@ -400,7 +416,7 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
                 <ArrowLeft />
                 Back
               </Button>
-              <Button onClick={() => setStep(3)} disabled={!canProceedStep2}>
+              <Button onClick={() => setStep(3)} disabled={!canProceedStep3}>
                 Next
                 <ArrowRight />
               </Button>
@@ -409,11 +425,79 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
         </Card>
       )}
 
-      {/* Step 3: Test & Publish */}
+      {/* Step 3: Capabilities & Tools */}
       {step === 3 && (
         <Card>
           <CardHeader>
-            <CardTitle>Test & publish</CardTitle>
+            <CardTitle>Capabilities & tools</CardTitle>
+            <CardDescription>Choose what your AI agent can do. This controls which tools it can access.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <Label>Agent capabilities *</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {Object.values(AGENT_BEHAVIORS).map((behavior) => {
+                  const isEnabled = behaviors.includes(behavior);
+                  return (
+                    <button
+                      key={behavior}
+                      type="button"
+                      onClick={() => {
+                        if (isEnabled) {
+                          setBehaviors(behaviors.filter((b) => b !== behavior));
+                        } else {
+                          setBehaviors([...behaviors, behavior]);
+                        }
+                      }}
+                      className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
+                        isEnabled
+                          ? "border-primary bg-primary/5"
+                          : "hover:border-muted-foreground/50"
+                      }`}
+                    >
+                      <div className={`flex size-5 shrink-0 items-center justify-center rounded border ${isEnabled ? "border-primary bg-primary" : "border-muted-foreground"}`}>
+                        {isEnabled && <span className="text-white text-xs">✓</span>}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{AGENT_BEHAVIOR_LABELS[behavior as keyof typeof AGENT_BEHAVIOR_LABELS]}</p>
+                        <p className="text-muted-foreground text-xs">{AGENT_BEHAVIOR_DESCRIPTIONS[behavior as keyof typeof AGENT_BEHAVIOR_DESCRIPTIONS]}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {behaviors.length > 0 && (
+              <div className="rounded-md border bg-muted/30 p-3">
+                <p className="text-sm font-medium">Enabled tools:</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {getToolsForBehaviors(behaviors as any).map((tool) => (
+                    <span key={tool} className="rounded-full bg-primary/10 px-2 py-0.5 text-xs">
+                      {TOOL_LABELS[tool as keyof typeof TOOL_LABELS]}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(2)} disabled={isLoading}>
+                <ArrowLeft />
+                Back
+              </Button>
+              <Button onClick={() => setStep(4)} disabled={!canProceedStep4}>
+                Next
+                <ArrowRight />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 4: Review & Publish */}
+      {step === 4 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Review & publish</CardTitle>
             <CardDescription>Review your agent settings and activate.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -429,14 +513,15 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
                 <p><strong>Primary Goal:</strong> {AGENT_GOALS.find((g) => g.id === primaryGoal)?.label}</p>
                 <p><strong>Fallback:</strong> {fallbackAction === "transfer_human" ? "Transfer to human" : fallbackAction === "create_ticket" ? "Create ticket" : "Collect info"}</p>
                 <p><strong>Greeting:</strong> {greeting}</p>
+                <p><strong>Capabilities:</strong> {behaviors.map((b) => AGENT_BEHAVIOR_LABELS[b as keyof typeof AGENT_BEHAVIOR_LABELS]).join(", ")}</p>
               </div>
             </div>
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(2)} disabled={isLoading}>
+              <Button variant="outline" onClick={() => setStep(3)} disabled={isLoading}>
                 <ArrowLeft />
                 Back
               </Button>
-              <Button onClick={handleSubmit} disabled={!canProceedStep3 || isLoading}>
+              <Button onClick={handleSubmit} disabled={!canProceedStep4 || isLoading}>
                 {isLoading && <Loader2 className="size-4 animate-spin" />}
                 Create Agent
               </Button>

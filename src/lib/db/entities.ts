@@ -38,6 +38,8 @@ export interface AgentEntity {
   primary_goal: string;
   secondary_goal: string;
   fallback_action: string;
+  behaviors: string[];
+  allowed_tools: string[];
 }
 
 export interface KnowledgeSourceEntity {
@@ -53,6 +55,7 @@ export interface KnowledgeSourceEntity {
   chunk_count: number;
   date_created: string;
   date_updated: string;
+  visibility: "public" | "internal";
 }
 
 export interface KnowledgeChunkEntity {

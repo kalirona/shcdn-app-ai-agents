@@ -14,6 +14,8 @@ export interface CreateAgentParams {
   primaryGoal?: string;
   secondaryGoal?: string;
   fallbackAction?: string;
+  behaviors?: string[];
+  allowedTools?: string[];
 }
 
 export async function createAgent(params: CreateAgentParams): Promise<AgentEntity> {
@@ -32,6 +34,8 @@ export async function createAgent(params: CreateAgentParams): Promise<AgentEntit
     primary_goal: params.primaryGoal ?? "answer_questions",
     secondary_goal: params.secondaryGoal ?? "",
     fallback_action: params.fallbackAction ?? "transfer_human",
+    behaviors: params.behaviors ?? ["answer_questions", "human_handoff"],
+    allowed_tools: params.allowedTools ?? ["request_human"],
   });
 }
 

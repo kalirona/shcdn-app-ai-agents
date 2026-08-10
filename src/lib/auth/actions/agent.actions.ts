@@ -43,6 +43,8 @@ export async function createAgent(workspaceId: string, data: z.infer<typeof crea
         primary_goal: parsed.data.primaryGoal,
         secondary_goal: parsed.data.secondaryGoal,
         fallback_action: parsed.data.fallbackAction,
+        behaviors: parsed.data.behaviors,
+        allowed_tools: parsed.data.allowedTools,
       });
     } else {
       const agentRepo = await import("@/lib/db/repositories/agent.repo");

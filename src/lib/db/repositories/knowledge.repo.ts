@@ -8,6 +8,7 @@ export interface CreateKnowledgeSourceParams {
   title: string;
   url?: string;
   file?: string;
+  visibility?: "public" | "internal";
 }
 
 export async function createKnowledgeSource(params: CreateKnowledgeSourceParams): Promise<KnowledgeSourceEntity> {
@@ -19,6 +20,7 @@ export async function createKnowledgeSource(params: CreateKnowledgeSourceParams)
     url: params.url ?? null,
     file: params.file ?? null,
     error_message: null,
+    visibility: params.visibility ?? "public",
   });
 }
 

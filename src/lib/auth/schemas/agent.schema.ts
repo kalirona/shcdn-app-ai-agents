@@ -26,6 +26,8 @@ export const createAgentSchema = z.object({
   primaryGoal: z.string().optional().default("answer_questions"),
   secondaryGoal: z.string().optional().default(""),
   fallbackAction: z.string().optional().default("transfer_human"),
+  behaviors: z.array(z.string()).optional().default(["answer_questions", "human_handoff"]),
+  allowedTools: z.array(z.string()).optional().default(["request_human"]),
 });
 
 export const updateAgentSchema = z.object({
