@@ -4,10 +4,29 @@ export interface Customer {
   email: string;
   phone: string | null;
   company: string | null;
+  stage: "anonymous" | "lead" | "customer";
+  conversations: string[];
+  leads: string[];
+  bookings: string[];
+  notes: string | null;
   totalConversations: number;
   totalBookings: number;
   totalValue: number;
   lastContact: string;
+  dateCreated: string;
+}
+
+export interface Lead {
+  id: string;
+  workspace: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  company: string | null;
+  message: string | null;
+  source: string | null;
+  status: "new" | "contacted" | "qualified" | "won" | "lost";
+  qualification: Record<string, string>;
   dateCreated: string;
 }
 
@@ -24,6 +43,7 @@ export interface Quote {
 
 const CUSTOMERS_KEY = "agent_ai_customers";
 const QUOTES_KEY = "agent_ai_quotes";
+const LEADS_KEY = "agent_ai_leads";
 
 function getStore<T>(key: string): T[] {
   if (typeof window === "undefined") return [];
@@ -78,4 +98,32 @@ export function saveQuoteToStorage(quote: Quote): void {
 export function deleteQuoteFromStorage(quoteId: string): void {
   const quotes = getQuotesFromStorage().filter((q) => q.id !== quoteId);
   setStore(QUOTES_KEY, quotes);
+}
+
+export function getLeadsFromStorage(): Lead[] {
+  return getStore<Lead>(LEADS_KEY);
+}
+
+export function getLeadsByWorkspace(workspaceId: string): Lead[] {
+  return getLeadsFromStorage().filter((l) => l.workspace === workspaceId);
+}
+
+export function saveLeadToStorage(lead: Lead): void {
+  const leads = getLeadsFromStorage();
+  const idx = leads.findIndex((l) => l.id === lead.id);
+  if (idx >= 0) {
+    leads[idx] = lead;
+  } else {
+    leads.push(lead);
+  }
+  setStore(LEADS_KEY, leads);
+}
+
+export function deleteLeadFromStorage(leadId: string): void {
+  const leads = getLeadsFromStorage().filter((l) => l.id !== leadId);
+  setStore(LEADS_KEY, leads);
+}
+
+export function getLeadByEmail(email: string): Lead | null {
+  return getLeadsFromStorage().find((l) => l.email === email) ?? null;
 }

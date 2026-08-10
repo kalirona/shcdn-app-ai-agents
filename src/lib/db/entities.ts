@@ -105,6 +105,7 @@ export interface LeadEntity {
   message: string | null;
   source: string | null;
   status: "new" | "contacted" | "qualified" | "won" | "lost";
+  qualification: Record<string, string>;
   date_created: string;
   date_updated: string;
 }
