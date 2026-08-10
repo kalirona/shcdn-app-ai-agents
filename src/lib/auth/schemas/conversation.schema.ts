@@ -7,7 +7,7 @@ export const sendMessageSchema = z.object({
 
 export const updateConversationStatusSchema = z.object({
   conversationId: z.string().min(1),
-  status: z.enum(["active", "resolved", "handoff"]),
+  status: z.enum(["active", "human_required", "with_human", "resolved"]),
 });
 
 export const addInternalNoteSchema = z.object({
@@ -21,7 +21,7 @@ export const assignConversationSchema = z.object({
 });
 
 export const filterConversationsSchema = z.object({
-  status: z.enum(["active", "resolved", "handoff", "all"]).optional(),
+  status: z.enum(["active", "human_required", "with_human", "resolved", "all"]).optional(),
   agentId: z.string().optional(),
   search: z.string().max(200).optional(),
   limit: z.number().min(1).max(100).default(20),

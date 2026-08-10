@@ -71,9 +71,12 @@ export interface ConversationEntity {
   id: string;
   workspace: string;
   agent: string;
+  customer: string | null;
   customer_email: string | null;
   customer_name: string | null;
-  status: "active" | "resolved" | "handoff";
+  status: "active" | "human_required" | "with_human" | "resolved";
+  handoff_trigger: string | null;
+  handoff_reason: string | null;
   date_created: string;
   date_updated: string;
 }
@@ -113,6 +116,10 @@ export interface CustomerEntity {
   email: string;
   phone: string | null;
   company: string | null;
+  stage: "anonymous" | "lead" | "customer";
+  conversations: string[];
+  leads: string[];
+  bookings: string[];
   notes: string | null;
   date_created: string;
   date_updated: string;

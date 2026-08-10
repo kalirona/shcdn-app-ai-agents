@@ -16,10 +16,11 @@ import type { ConversationEntity } from "@/lib/db/entities";
 const WORKSPACE_ID = "placeholder-workspace-id";
 
 function StatusDot({ status }: { status: ConversationEntity["status"] }) {
-  const colors = {
+  const colors: Record<ConversationEntity["status"], string> = {
     active: "bg-green-500",
+    human_required: "bg-red-500",
+    with_human: "bg-yellow-500",
     resolved: "bg-muted-foreground",
-    handoff: "bg-red-500",
   };
 
   return <span className={`size-2 rounded-full ${colors[status]}`} />;
@@ -135,18 +136,22 @@ export default function ConversationsPage() {
                 </div>
                 <span
                   className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${
-                    conversation.status === "handoff"
+                    conversation.status === "human_required"
                       ? "border-red-200 bg-red-50 text-red-700"
-                      : conversation.status === "resolved"
-                        ? "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
-                        : "border-green-200 bg-green-50 text-green-700"
+                      : conversation.status === "with_human"
+                        ? "border-yellow-200 bg-yellow-50 text-yellow-700"
+                        : conversation.status === "resolved"
+                          ? "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
+                          : "border-green-200 bg-green-50 text-green-700"
                   }`}
                 >
-                  {conversation.status === "handoff"
+                  {conversation.status === "human_required"
                     ? "Needs Human"
-                    : conversation.status === "resolved"
-                      ? "Resolved"
-                      : "Active"}
+                    : conversation.status === "with_human"
+                      ? "With Human"
+                      : conversation.status === "resolved"
+                        ? "Resolved"
+                        : "Active"}
                 </span>
               </div>
             </Link>

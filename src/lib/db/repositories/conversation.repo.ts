@@ -4,6 +4,7 @@ import type { ConversationEntity, MessageEntity } from "../entities";
 export interface CreateConversationParams {
   workspace: string;
   agent: string;
+  customer?: string;
   customerEmail?: string;
   customerName?: string;
 }
@@ -12,8 +13,11 @@ export async function createConversation(params: CreateConversationParams): Prom
   return db.conversation.create({
     workspace: params.workspace,
     agent: params.agent,
+    customer: params.customer ?? null,
     customer_email: params.customerEmail ?? null,
     customer_name: params.customerName ?? null,
+    handoff_trigger: null,
+    handoff_reason: null,
   });
 }
 
@@ -35,9 +39,15 @@ export async function getConversationById(id: string): Promise<ConversationEntit
 
 export async function updateConversationStatus(
   id: string,
-  status: "active" | "resolved" | "handoff",
+  status: "active" | "human_required" | "with_human" | "resolved",
+  handoffTrigger?: string,
+  handoffReason?: string,
 ): Promise<ConversationEntity> {
-  return db.conversation.update(id, { status });
+  return db.conversation.update(id, {
+    status,
+    handoff_trigger: handoffTrigger ?? null,
+    handoff_reason: handoffReason ?? null,
+  });
 }
 
 export async function deleteConversation(id: string): Promise<void> {

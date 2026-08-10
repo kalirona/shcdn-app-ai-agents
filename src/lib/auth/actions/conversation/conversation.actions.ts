@@ -90,7 +90,7 @@ export async function takeOverConversation(conversationId: string) {
   await requireAuth();
 
   try {
-    await conversationRepo.updateConversationStatus(conversationId, "handoff");
+    await conversationRepo.updateConversationStatus(conversationId, "with_human", "human_took_over", "Human agent took over conversation");
     revalidatePath("/dashboard/conversations");
     return { success: true };
   } catch (error) {

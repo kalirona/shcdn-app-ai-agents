@@ -27,10 +27,11 @@ import type { ConversationEntity, MessageEntity } from "@/lib/db/entities";
 const WORKSPACE_ID = "placeholder-workspace-id";
 
 function StatusBadge({ status }: { status: ConversationEntity["status"] }) {
-  const config = {
+  const config: Record<ConversationEntity["status"], { label: string; color: string }> = {
     active: { label: "Active", color: "border-green-200 text-green-700 bg-green-50" },
+    human_required: { label: "Needs Human", color: "border-red-200 text-red-700 bg-red-50" },
+    with_human: { label: "With Human", color: "border-yellow-200 text-yellow-700 bg-yellow-50" },
     resolved: { label: "Resolved", color: "border-muted-foreground/30 text-muted-foreground bg-muted/50" },
-    handoff: { label: "Needs Human", color: "border-red-200 text-red-700 bg-red-50" },
   };
 
   const { label, color } = config[status];
@@ -88,7 +89,7 @@ export default function ConversationDetailPage({ params }: { params: { id: strin
       toast.error(result.error);
     } else {
       toast.success("You've taken over this conversation.");
-      setConversation((prev) => (prev ? { ...prev, status: "handoff" } : null));
+      setConversation((prev) => (prev ? { ...prev, status: "with_human" as const } : null));
     }
     setIsTakingOver(false);
   }
@@ -155,7 +156,7 @@ export default function ConversationDetailPage({ params }: { params: { id: strin
 
         <div className="flex items-center gap-2">
           {conversation.status !== "resolved" &&
-            (conversation.status === "handoff" ? (
+            (conversation.status === "with_human" ? (
               <Button onClick={handleReturnToAi} variant="outline">
                 <Bot />
                 Return to AI
@@ -228,7 +229,7 @@ export default function ConversationDetailPage({ params }: { params: { id: strin
                     void handleReply();
                   }
                 }}
-                disabled={isSending || conversation.status === "handoff"}
+                disabled={isSending || conversation.status === "human_required" || conversation.status === "with_human"}
                 className="flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
                 rows={2}
                 maxLength={4000}
@@ -237,8 +238,11 @@ export default function ConversationDetailPage({ params }: { params: { id: strin
                 {isSending ? <Loader2 className="size-4 animate-spin" /> : "Send"}
               </Button>
             </div>
-            {conversation.status === "handoff" && (
+            {conversation.status === "human_required" && (
               <p className="mt-2 text-muted-foreground text-xs">This conversation is waiting for a human response.</p>
+            )}
+            {conversation.status === "with_human" && (
+              <p className="mt-2 text-muted-foreground text-xs">A human agent is handling this conversation.</p>
             )}
           </div>
         )}
