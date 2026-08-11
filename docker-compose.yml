@@ -6,10 +6,10 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "9000:3000"
+      - "9000:9000"
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=9000
       - HOSTNAME=0.0.0.0
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - LOGTO_ENDPOINT=${LOGTO_ENDPOINT}
@@ -35,7 +35,7 @@ services:
       - R2_PUBLIC_URL=${R2_PUBLIC_URL}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health || exit 1"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
