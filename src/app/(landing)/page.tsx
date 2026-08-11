@@ -8,6 +8,8 @@ import {
   Zap,
 } from "lucide-react";
 
+import { signInAction, signUpAction } from "@/lib/auth/auth-actions";
+
 const FEATURES = [
   {
     icon: Bot,
@@ -138,15 +140,19 @@ export default function LandingPage() {
             <a href="#faq" className="text-muted-foreground text-sm hover:text-foreground">FAQ</a>
           </nav>
           <div className="flex items-center gap-3">
-            <Link href="/auth/v1/login" className="text-sm font-medium hover:underline">
-              Sign In
-            </Link>
-            <Link
-              href="/auth/v1/register"
-              className="rounded-lg bg-primary px-4 py-2 text-primary-foreground text-sm font-medium"
-            >
-              Get Started
-            </Link>
+            <form action={signInAction}>
+              <button type="submit" className="text-sm font-medium hover:underline">
+                Sign In
+              </button>
+            </form>
+            <form action={signUpAction}>
+              <button
+                type="submit"
+                className="rounded-lg bg-primary px-4 py-2 text-primary-foreground text-sm font-medium"
+              >
+                Get Started
+              </button>
+            </form>
           </div>
         </div>
       </header>
