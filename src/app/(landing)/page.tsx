@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   Bot,
   Check,
@@ -171,12 +170,14 @@ export default function LandingPage() {
             Train your AI with your own content and let it handle customer conversations 24/7.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <Link
-              href="/auth/v1/register"
-              className="rounded-xl bg-primary px-8 py-3 text-primary-foreground font-medium"
-            >
-              Start Free Trial
-            </Link>
+            <form action={signUpAction}>
+              <button
+                type="submit"
+                className="rounded-xl bg-primary px-8 py-3 font-medium text-primary-foreground"
+              >
+                Start Free Trial
+              </button>
+            </form>
             <a
               href="#pricing"
               className="rounded-xl border px-8 py-3 font-medium hover:border-muted-foreground/50"
@@ -243,16 +244,18 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/auth/v1/register"
-                  className={`mt-6 block w-full rounded-lg py-2.5 text-center font-medium ${
-                    plan.popular
-                      ? "bg-primary text-primary-foreground"
-                      : "border hover:border-muted-foreground/50"
-                  }`}
-                >
-                  {plan.cta}
-                </Link>
+                <form action={signUpAction}>
+                  <button
+                    type="submit"
+                    className={`mt-6 block w-full rounded-lg py-2.5 text-center font-medium ${
+                      plan.popular
+                        ? "bg-primary text-primary-foreground"
+                        : "border hover:border-muted-foreground/50"
+                    }`}
+                  >
+                    {plan.cta}
+                  </button>
+                </form>
               </div>
             ))}
           </div>
@@ -284,12 +287,14 @@ export default function LandingPage() {
           <p className="mt-3 text-lg opacity-90">
             Join hundreds of businesses using Agent AI to handle conversations 24/7.
           </p>
-          <Link
-            href="/auth/v1/register"
-            className="mt-6 inline-block rounded-xl bg-background px-8 py-3 text-foreground font-medium"
-          >
-            Start Your Free Trial
-          </Link>
+          <form action={signUpAction}>
+            <button
+              type="submit"
+              className="mt-6 inline-block rounded-xl bg-background px-8 py-3 font-medium text-foreground"
+            >
+              Start Your Free Trial
+            </button>
+          </form>
         </div>
       </section>
 
