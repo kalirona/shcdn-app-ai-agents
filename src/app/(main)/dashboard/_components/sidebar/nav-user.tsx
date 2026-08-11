@@ -18,8 +18,14 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/c
 import { signOutAction } from "@/lib/auth/auth-actions";
 import { getInitials } from "@/lib/utils";
 
-export function NavUser() {
+interface NavUserProps {
+  user: { id: string; email: string; name: string | null; avatar: string | null };
+}
+
+export function NavUser({ user }: NavUserProps) {
   const { isMobile } = useSidebar();
+  const displayName = user.name || user.email.split("@")[0] || "User";
+  const initials = getInitials(displayName) || "U";
 
   return (
     <SidebarMenu>
@@ -31,11 +37,11 @@ export function NavUser() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
-                <AvatarFallback className="rounded-lg">U</AvatarFallback>
+                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">User</span>
-                <span className="truncate text-muted-foreground text-xs">user@company.com</span>
+                <span className="truncate font-medium">{displayName}</span>
+                <span className="truncate text-muted-foreground text-xs">{user.email}</span>
               </div>
             </SidebarMenuButton>
           </DropdownMenuTrigger>
@@ -48,11 +54,11 @@ export function NavUser() {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarFallback className="rounded-lg">U</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">User</span>
-                  <span className="truncate text-muted-foreground text-xs">user@company.com</span>
+                  <span className="truncate font-medium">{displayName}</span>
+                  <span className="truncate text-muted-foreground text-xs">{user.email}</span>
                 </div>
               </div>
             </DropdownMenuLabel>

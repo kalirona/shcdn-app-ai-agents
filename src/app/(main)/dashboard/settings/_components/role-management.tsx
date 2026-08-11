@@ -31,6 +31,7 @@ import {
   ROLES,
   type Role,
 } from "@/lib/auth/roles";
+import { getCurrentUser } from "@/lib/auth/actions/user.actions";
 
 interface Member {
   id: string;
@@ -43,7 +44,7 @@ interface Member {
 
 const STORAGE_KEY = "agent_ai_members";
 
-function getMembers(): Member[] {
+function getMembers(currentUser: { id: string; name: string; email: string } | null): Member[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -51,15 +52,17 @@ function getMembers(): Member[] {
   } catch {
     // ignore
   }
-  const defaults: Member[] = [
-    {
-      id: "dev-user-123",
-      name: "Dev User",
-      email: "dev@localhost.com",
-      role: ROLES.OWNER,
-      joinedAt: new Date().toISOString(),
-    },
-  ];
+  const defaults: Member[] = currentUser
+    ? [
+        {
+          id: currentUser.id,
+          name: currentUser.name,
+          email: currentUser.email,
+          role: ROLES.OWNER,
+          joinedAt: new Date().toISOString(),
+        },
+      ]
+    : [];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
   return defaults;
 }
@@ -84,8 +87,24 @@ export function RoleManagement() {
   const currentUserRole: Role = ROLES.OWNER;
 
   useEffect(() => {
-    setMembers(getMembers());
-    setIsLoading(false);
+    let cancelled = false;
+    const load = async () => {
+      let currentUser: { id: string; name: string; email: string } | null = null;
+      try {
+        const result = await getCurrentUser();
+        currentUser = result.user?.id ? { id: result.user.id, name: result.user.name ?? "", email: result.user.email } : null;
+      } catch {
+        // ignore
+      }
+      if (!cancelled) {
+        setMembers(getMembers(currentUser));
+        setIsLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function handleInvite(e: React.FormEvent) {
