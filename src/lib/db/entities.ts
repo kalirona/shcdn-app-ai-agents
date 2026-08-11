@@ -131,9 +131,9 @@ export interface CustomerEntity {
 export interface BookingEntity {
   id: string;
   workspace: string;
-  service: string;
-  date: string;
-  time: string;
+  service: string | null;
+  date: string | null;
+  time: string | null;
   customer_name: string;
   customer_email: string;
   customer_phone: string | null;

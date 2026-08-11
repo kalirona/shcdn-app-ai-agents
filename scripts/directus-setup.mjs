@@ -211,9 +211,55 @@ await field("messages", { field: "metadata", type: "json", schema: { is_nullable
 await rel("messages", "conversation", "conversations");
 await timestamps("messages");
 
+// 8. leads
+await col("leads", "star", "Leads captured by AI agents");
+await field("leads", m2o("workspace", "workspaces"));
+await field("leads", { field: "name", type: "string", schema: { is_nullable: false, max_length: 128 }, meta: { interface: "input", required: true } });
+await field("leads", { field: "email", type: "string", schema: { is_nullable: false, max_length: 256 }, meta: { interface: "input", required: true } });
+await field("leads", { field: "phone", type: "string", schema: { is_nullable: true, max_length: 64 }, meta: { interface: "input" } });
+await field("leads", { field: "company", type: "string", schema: { is_nullable: true, max_length: 128 }, meta: { interface: "input" } });
+await field("leads", { field: "message", type: "text", schema: { is_nullable: true }, meta: { interface: "textarea" } });
+await field("leads", { field: "source", type: "string", schema: { is_nullable: true, max_length: 64 }, meta: { interface: "input" } });
+await field("leads", { field: "status", type: "string", schema: { is_nullable: false, default_value: "new" }, meta: sel([
+  { text: "New", value: "new" }, { text: "Contacted", value: "contacted" }, { text: "Qualified", value: "qualified" }, { text: "Won", value: "won" }, { text: "Lost", value: "lost" },
+]) });
+await field("leads", { field: "qualification", type: "json", schema: { is_nullable: true, default_value: {} }, meta: { interface: "input-code", special: ["cast-json"] } });
+await rel("leads", "workspace", "workspaces");
+await timestamps("leads");
+
+// 9. bookings
+await col("bookings", "event", "Customer bookings with AI agents");
+await field("bookings", m2o("workspace", "workspaces"));
+await field("bookings", { field: "service", type: "string", schema: { is_nullable: true, max_length: 128 }, meta: { interface: "input" } });
+await field("bookings", { field: "date", type: "string", schema: { is_nullable: true, max_length: 32 }, meta: { interface: "input" } });
+await field("bookings", { field: "time", type: "string", schema: { is_nullable: true, max_length: 32 }, meta: { interface: "input" } });
+await field("bookings", { field: "customer_name", type: "string", schema: { is_nullable: false, max_length: 128 }, meta: { interface: "input", required: true } });
+await field("bookings", { field: "customer_email", type: "string", schema: { is_nullable: false, max_length: 256 }, meta: { interface: "input", required: true } });
+await field("bookings", { field: "customer_phone", type: "string", schema: { is_nullable: true, max_length: 64 }, meta: { interface: "input" } });
+await field("bookings", { field: "notes", type: "text", schema: { is_nullable: true }, meta: { interface: "textarea" } });
+await field("bookings", { field: "status", type: "string", schema: { is_nullable: false, default_value: "confirmed" }, meta: sel([
+  { text: "Confirmed", value: "confirmed" }, { text: "Cancelled", value: "cancelled" }, { text: "Completed", value: "completed" }, { text: "Rescheduled", value: "rescheduled" },
+]) });
+await rel("bookings", "workspace", "workspaces");
+await timestamps("bookings");
+
+// 10. customers
+await col("customers", "person", "Customer profiles for workspace");
+await field("customers", m2o("workspace", "workspaces"));
+await field("customers", { field: "name", type: "string", schema: { is_nullable: false, max_length: 128 }, meta: { interface: "input", required: true } });
+await field("customers", { field: "email", type: "string", schema: { is_nullable: false, max_length: 256 }, meta: { interface: "input", required: true } });
+await field("customers", { field: "phone", type: "string", schema: { is_nullable: true, max_length: 64 }, meta: { interface: "input" } });
+await field("customers", { field: "company", type: "string", schema: { is_nullable: true, max_length: 128 }, meta: { interface: "input" } });
+await field("customers", { field: "stage", type: "string", schema: { is_nullable: false, default_value: "lead" }, meta: sel([
+  { text: "Anonymous", value: "anonymous" }, { text: "Lead", value: "lead" }, { text: "Customer", value: "customer" },
+]) });
+await field("customers", { field: "notes", type: "text", schema: { is_nullable: true }, meta: { interface: "textarea" } });
+await rel("customers", "workspace", "workspaces");
+await timestamps("customers");
+
 console.log("\n-- RLS roles, policies & permissions --");
 
-const APP_COLLECTIONS = ["workspaces", "memberships", "agents", "knowledge_sources", "knowledge_chunks", "conversations", "messages"];
+const APP_COLLECTIONS = ["workspaces", "memberships", "agents", "knowledge_sources", "knowledge_chunks", "conversations", "messages", "leads", "bookings", "customers"];
 
 const ROLE_DEFS = [
   { key: "app_owner", name: "App Owner" },
@@ -310,8 +356,10 @@ async function configureRls() {
       await ensurePermission(managerPolicy, collection, action, ALL_FIELDS);
     }
 
-    // Agent: read-only on conversations, messages, agents, and knowledge
-    if (["conversations", "messages", "agents", "knowledge_sources", "knowledge_chunks"].includes(collection)) {
+    // Agent: read-only on conversations, messages, agents, knowledge, leads, bookings, customers
+    if (
+      ["conversations", "messages", "agents", "knowledge_sources", "knowledge_chunks", "leads", "bookings", "customers"].includes(collection)
+    ) {
       await ensurePermission(agentPolicy, collection, "read", ALL_FIELDS);
     }
   }

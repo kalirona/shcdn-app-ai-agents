@@ -1,29 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Calendar,
-  Check,
-  Clock,
-  Loader2,
-  Phone,
-  User,
-  X,
-} from "lucide-react";
+
+import { Calendar, Clock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getWorkspaceBookings, updateBookingStatus } from "@/lib/auth/actions/booking/booking.actions";
+import { getCurrentUser } from "@/lib/auth/actions/user.actions";
 import type { BookingEntity } from "@/lib/db/entities";
-
-const WORKSPACE_ID = "placeholder-workspace-id";
 
 const STATUS_OPTIONS = [
   { value: "confirmed", label: "Confirmed", color: "border-green-200 bg-green-50 text-green-700" },
@@ -32,29 +17,38 @@ const STATUS_OPTIONS = [
   { value: "rescheduled", label: "Rescheduled", color: "border-yellow-200 bg-yellow-50 text-yellow-700" },
 ];
 
-function StatusBadge({ status }: { status: BookingEntity["status"] }) {
-  const option = STATUS_OPTIONS.find((o) => o.value === status);
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${option?.color ?? ""}`}>
-      {option?.label ?? status}
-    </span>
-  );
-}
-
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<BookingEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadBookings = async () => {
-      const result = await getWorkspaceBookings(WORKSPACE_ID);
-      if (result.bookings) {
-        setBookings(result.bookings);
+      try {
+        const user = await getCurrentUser();
+        const ws = user.currentWorkspace;
+        if (!ws) {
+          return;
+        }
+        const result = await getWorkspaceBookings(ws.id);
+        if (!cancelled) {
+          setBookings(result.bookings);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
     };
 
-    loadBookings();
+    void loadBookings();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleStatusChange(bookingId: string, newStatus: BookingEntity["status"]) {
@@ -78,15 +72,17 @@ export default function BookingsPage() {
         <div className="flex items-center justify-center py-16">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
-      ) : bookings.length === 0 ? (
+      ) : null}
+
+      {!isLoading && bookings.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
           <Calendar className="size-12 text-muted-foreground" />
           <h3 className="mt-4 font-semibold text-lg">No bookings yet</h3>
-          <p className="mt-1 text-muted-foreground text-sm">
-            Appointments booked by your AI agents will appear here.
-          </p>
+          <p className="mt-1 text-muted-foreground text-sm">Appointments booked by your AI agents will appear here.</p>
         </div>
-      ) : (
+      ) : null}
+
+      {!isLoading && bookings.length > 0 ? (
         <div className="overflow-hidden rounded-lg border">
           <table className="w-full">
             <thead>
@@ -137,7 +133,7 @@ export default function BookingsPage() {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

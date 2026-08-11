@@ -22,9 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getWorkspaceLeads, updateLeadStatus, exportLeads } from "@/lib/auth/actions/lead/lead.actions";
+import { getCurrentUser } from "@/lib/auth/actions/user.actions";
 import type { LeadEntity } from "@/lib/db/entities";
-
-const WORKSPACE_ID = "placeholder-workspace-id";
 
 const STATUS_OPTIONS = [
   { value: "new", label: "New", color: "border-blue-200 bg-blue-50 text-blue-700" },
@@ -47,12 +46,24 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<LeadEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadLeads = async () => {
-      const result = await getWorkspaceLeads(WORKSPACE_ID);
-      if (result.leads) {
-        setLeads(result.leads);
+      try {
+        const user = await getCurrentUser();
+        const ws = user.currentWorkspace;
+        if (!ws) {
+          setIsLoading(false);
+          return;
+        }
+        setWorkspaceId(ws.id);
+        const result = await getWorkspaceLeads(ws.id);
+        if (result.leads) {
+          setLeads(result.leads);
+        }
+      } catch {
+        // ignore
       }
       setIsLoading(false);
     };
@@ -71,7 +82,8 @@ export default function LeadsPage() {
   }
 
   async function handleExport() {
-    const result = await exportLeads(WORKSPACE_ID);
+    if (!workspaceId) return;
+    const result = await exportLeads(workspaceId);
     if (result.error || !result.data || !result.filename) {
       toast.error(result.error ?? "Export failed");
       return;

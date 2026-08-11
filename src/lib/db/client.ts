@@ -1,8 +1,11 @@
 import type {
   AgentEntity,
+  BookingEntity,
   ConversationEntity,
+  CustomerEntity,
   KnowledgeChunkEntity,
   KnowledgeSourceEntity,
+  LeadEntity,
   MembershipEntity,
   MessageEntity,
   WorkspaceEntity,
@@ -281,5 +284,89 @@ export const db = {
       ),
 
     delete: (id: string) => request<void>(`/messages/${id}`, { method: "DELETE" }),
+  },
+
+  lead: {
+    create: (data: Omit<LeadEntity, "id" | "date_created" | "date_updated">) =>
+      request<LeadEntity>("/leads", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    getById: (id: string) => request<LeadEntity>(`/leads/${id}`),
+
+    getByWorkspace: (workspaceId: string) =>
+      request<LeadEntity[]>(
+        "/leads",
+        {},
+        {
+          filter: { workspace: { _eq: workspaceId } },
+          sort: ["-date_created"],
+        },
+      ),
+
+    update: (id: string, data: Partial<LeadEntity>) =>
+      request<LeadEntity>(`/leads/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    delete: (id: string) => request<void>(`/leads/${id}`, { method: "DELETE" }),
+  },
+
+  booking: {
+    create: (data: Omit<BookingEntity, "id" | "date_created" | "date_updated">) =>
+      request<BookingEntity>("/bookings", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    getById: (id: string) => request<BookingEntity>(`/bookings/${id}`),
+
+    getByWorkspace: (workspaceId: string) =>
+      request<BookingEntity[]>(
+        "/bookings",
+        {},
+        {
+          filter: { workspace: { _eq: workspaceId } },
+          sort: ["-date_created"],
+        },
+      ),
+
+    update: (id: string, data: Partial<BookingEntity>) =>
+      request<BookingEntity>(`/bookings/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    delete: (id: string) => request<void>(`/bookings/${id}`, { method: "DELETE" }),
+  },
+
+  customer: {
+    create: (data: Omit<CustomerEntity, "id" | "date_created" | "date_updated">) =>
+      request<CustomerEntity>("/customers", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    getById: (id: string) => request<CustomerEntity>(`/customers/${id}`),
+
+    getByWorkspace: (workspaceId: string) =>
+      request<CustomerEntity[]>(
+        "/customers",
+        {},
+        {
+          filter: { workspace: { _eq: workspaceId } },
+          sort: ["-date_created"],
+        },
+      ),
+
+    update: (id: string, data: Partial<CustomerEntity>) =>
+      request<CustomerEntity>(`/customers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    delete: (id: string) => request<void>(`/customers/${id}`, { method: "DELETE" }),
   },
 };
