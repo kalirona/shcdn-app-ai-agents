@@ -1,21 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Check,
-  CreditCard,
-  Loader2,
-  Shield,
-  Zap,
-} from "lucide-react";
+
+import { Check, CreditCard, Loader2, Shield, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  PLAN_LIMITS,
-} from "@/lib/auth/schemas/billing.schema";
-import { cancelSubscription, createCheckoutSession, getBillingStatus } from "@/lib/auth/actions/billing/billing.actions";
+  cancelSubscription,
+  createCheckoutSession,
+  getBillingStatus,
+} from "@/lib/auth/actions/billing/billing.actions";
+import { PLAN_LIMITS } from "@/lib/auth/schemas/billing.schema";
 
 const PLANS = [
   {
@@ -23,13 +20,7 @@ const PLANS = [
     name: "Starter",
     price: 29,
     description: "For small businesses getting started",
-    features: [
-      "1 AI Agent",
-      "1,000 conversations/mo",
-      "50MB knowledge storage",
-      "Lead capture",
-      "Booking system",
-    ],
+    features: ["1 AI Agent", "1,000 conversations/mo", "50MB knowledge storage", "Lead capture", "Booking system"],
   },
   {
     id: "business" as const,
@@ -230,10 +221,7 @@ export default function BillingPage() {
       {/* Plans */}
       <div className="grid gap-6 lg:grid-cols-3">
         {PLANS.map((plan) => (
-          <Card
-            key={plan.id}
-            className={plan.popular ? "relative border-primary ring-1 ring-primary" : ""}
-          >
+          <Card key={plan.id} className={plan.popular ? "relative border-primary ring-1 ring-primary" : ""}>
             {plan.popular && (
               <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-primary-foreground text-xs">
                 Most Popular

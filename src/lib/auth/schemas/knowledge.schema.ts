@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const addWebsiteSourceSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
   url: z
     .string()
     .trim()
@@ -22,6 +23,7 @@ export const addWebsiteSourceSchema = z.object({
 });
 
 export const addTextSourceSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
   title: z.string().trim().min(1, "Title is required.").max(256, "Title must be 256 characters or less."),
   content: z
     .string()
@@ -32,6 +34,7 @@ export const addTextSourceSchema = z.object({
 });
 
 export const addFaqSourceSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
   title: z.string().trim().min(1, "Title is required.").max(256, "Title must be 256 characters or less."),
   faqs: z
     .array(
@@ -47,6 +50,11 @@ export const addFaqSourceSchema = z.object({
 
 export const deleteSourceSchema = z.object({
   sourceId: z.string().min(1, "Source ID is required."),
+});
+
+export const getAgentSourcesSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  agentId: z.string().min(1, "Agent ID is required."),
 });
 
 export type AddWebsiteSourceInput = z.infer<typeof addWebsiteSourceSchema>;

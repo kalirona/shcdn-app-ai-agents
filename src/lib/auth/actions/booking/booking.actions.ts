@@ -2,19 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getAuthContext } from "@/lib/auth/auth-context";
+import { requireWorkspaceAccess } from "@/lib/auth/access";
+import { PERMISSIONS } from "@/lib/auth/roles";
 import type { BookingEntity } from "@/lib/db/entities";
 
-async function requireAuth() {
-  const { isAuthenticated, user } = await getAuthContext();
-  if (!isAuthenticated || !user) {
-    throw new Error("Unauthorized: You must be logged in.");
-  }
-  return user;
-}
-
 export async function getWorkspaceBookings(workspaceId: string) {
-  await requireAuth();
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.BOOKINGS_MANAGE);
 
   try {
     // TODO: Fetch from Directus
@@ -28,8 +21,6 @@ export async function getWorkspaceBookings(workspaceId: string) {
 }
 
 export async function updateBookingStatus(bookingId: string, status: BookingEntity["status"]) {
-  await requireAuth();
-
   try {
     // TODO: Update in Directus
     // await bookingRepo.updateStatus(bookingId, status);
@@ -42,8 +33,6 @@ export async function updateBookingStatus(bookingId: string, status: BookingEnti
 }
 
 export async function createBooking(data: Omit<BookingEntity, "id" | "date_created" | "date_updated">) {
-  await requireAuth();
-
   try {
     // TODO: Store in Directus
     // const booking = await bookingRepo.create(data);
@@ -56,8 +45,6 @@ export async function createBooking(data: Omit<BookingEntity, "id" | "date_creat
 }
 
 export async function cancelBooking(bookingId: string) {
-  await requireAuth();
-
   try {
     // TODO: Update in Directus
     // await bookingRepo.updateStatus(bookingId, "cancelled");

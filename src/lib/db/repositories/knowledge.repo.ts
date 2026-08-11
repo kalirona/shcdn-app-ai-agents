@@ -28,6 +28,14 @@ export async function getAgentKnowledgeSources(agentId: string): Promise<Knowled
   return db.knowledgeSource.getByAgent(agentId);
 }
 
+export async function getKnowledgeSourceById(id: string): Promise<KnowledgeSourceEntity | null> {
+  try {
+    return await db.knowledgeSource.getById(id);
+  } catch {
+    return null;
+  }
+}
+
 export async function getWorkspaceKnowledgeSources(workspaceId: string): Promise<KnowledgeSourceEntity[]> {
   return db.knowledgeSource.getByWorkspace(workspaceId);
 }

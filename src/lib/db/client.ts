@@ -86,10 +86,14 @@ export const db = {
   },
 
   membership: {
-    create: (data: Omit<MembershipEntity, "id" | "date_created" | "date_updated" | "status">) =>
+    create: (
+      data: Omit<MembershipEntity, "id" | "date_created" | "date_updated" | "status"> & {
+        status?: "active" | "invited" | "inactive";
+      },
+    ) =>
       request<MembershipEntity>("/memberships", {
         method: "POST",
-        body: JSON.stringify({ ...data, status: "active" }),
+        body: JSON.stringify({ ...data, status: data.status ?? "active" }),
       }),
 
     getById: (id: string) => request<MembershipEntity>(`/memberships/${id}`),

@@ -1,24 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+
 import type { z } from "zod";
 
-import { getAuthContext } from "@/lib/auth/auth-context";
+import { requireWorkspaceAccess } from "@/lib/auth/access";
+import { PERMISSIONS } from "@/lib/auth/roles";
 import { createAgentSchema, updateAgentSchema } from "@/lib/auth/schemas/agent.schema";
 
 const isLocalDev = process.env.NODE_ENV === "development" && !process.env.DIRECTUS_URL;
 
-async function requireAuth() {
-  const { isAuthenticated, user } = await getAuthContext();
-  if (!isAuthenticated || !user) {
-    throw new Error("Unauthorized: You must be logged in.");
-  }
-  return user;
-}
-
 export async function createAgent(workspaceId: string, data: z.infer<typeof createAgentSchema>) {
-  await requireAuth();
-
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.AGENTS_CREATE);
   const parsed = createAgentSchema.safeParse(data);
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
@@ -73,14 +66,18 @@ export async function createAgent(workspaceId: string, data: z.infer<typeof crea
 }
 
 export async function updateAgent(agentId: string, data: z.infer<typeof updateAgentSchema>) {
-  await requireAuth();
-
   const parsed = updateAgentSchema.safeParse(data);
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
 
   try {
+    const agentRepo = await import("@/lib/db/repositories/agent.repo");
+    const existing = isLocalDev ? null : await agentRepo.getAgentById(agentId);
+    if (existing) {
+      await requireWorkspaceAccess(existing.workspace, PERMISSIONS.AGENTS_UPDATE);
+    }
+
     if (isLocalDev) {
       const { localDb } = await import("@/lib/db/local-storage");
       await localDb.agent.update(agentId, {
@@ -94,7 +91,6 @@ export async function updateAgent(agentId: string, data: z.infer<typeof updateAg
         status: parsed.data.status,
       });
     } else {
-      const agentRepo = await import("@/lib/db/repositories/agent.repo");
       await agentRepo.updateAgent(agentId, {
         name: parsed.data.name,
         description: parsed.data.description,
@@ -117,9 +113,13 @@ export async function updateAgent(agentId: string, data: z.infer<typeof updateAg
 }
 
 export async function deleteAgent(agentId: string) {
-  await requireAuth();
-
   try {
+    const agentRepo = await import("@/lib/db/repositories/agent.repo");
+    const existing = isLocalDev ? null : await agentRepo.getAgentById(agentId);
+    if (existing) {
+      await requireWorkspaceAccess(existing.workspace, PERMISSIONS.AGENTS_DELETE);
+    }
+
     if (isLocalDev) {
       const { localDb } = await import("@/lib/db/local-storage");
       await localDb.agent.delete(agentId);
@@ -137,7 +137,7 @@ export async function deleteAgent(agentId: string) {
 }
 
 export async function getWorkspaceAgents(workspaceId: string) {
-  await requireAuth();
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.AGENTS_READ);
 
   try {
     let agents;
@@ -158,17 +158,14 @@ export async function getWorkspaceAgents(workspaceId: string) {
 }
 
 export async function getAgentById(agentId: string) {
-  await requireAuth();
-
   try {
-    let agent;
+    const agentRepo = await import("@/lib/db/repositories/agent.repo");
+    const agent = isLocalDev
+      ? (await import("@/lib/db/local-storage")).localDb.agent.getById(agentId)
+      : await agentRepo.getAgentById(agentId);
 
-    if (isLocalDev) {
-      const { localDb } = await import("@/lib/db/local-storage");
-      agent = localDb.agent.getById(agentId);
-    } else {
-      const agentRepo = await import("@/lib/db/repositories/agent.repo");
-      agent = await agentRepo.getAgentById(agentId);
+    if (agent) {
+      await requireWorkspaceAccess(agent.workspace, PERMISSIONS.AGENTS_READ);
     }
 
     if (!agent) {

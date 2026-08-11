@@ -16,6 +16,8 @@ export interface MembershipEntity {
   user: string;
   role: "owner" | "admin" | "member";
   status: "active" | "invited" | "inactive";
+  email: string | null;
+  name: string | null;
   date_created: string;
   date_updated: string;
 }

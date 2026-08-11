@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Shield, UserMinus, UserPlus } from "lucide-react";
+
+import { Loader2, Mail, Shield, User, UserMinus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -16,90 +17,91 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  ROLE_DESCRIPTIONS,
-  ROLE_LABELS,
-  hasPermission,
-  PERMISSIONS,
-  ROLES,
-  type Role,
-} from "@/lib/auth/roles";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCurrentUser } from "@/lib/auth/actions/user.actions";
+import {
+  getWorkspaceMembers,
+  inviteMember,
+  removeMember,
+  updateMemberRole,
+} from "@/lib/auth/actions/workspace.actions";
+import { hasPermission, PERMISSIONS, ROLES, type Role } from "@/lib/auth/roles";
+import { ROLE_LABELS } from "@/lib/auth/types";
 
-interface Member {
+interface MemberRow {
   id: string;
-  name: string;
-  email: string;
+  user: string;
+  name: string | null;
+  email: string | null;
   role: Role;
+  status: "active" | "invited" | "inactive";
   joinedAt: string;
-  avatar?: string;
+  isSelf: boolean;
 }
 
-const STORAGE_KEY = "agent_ai_members";
+type AssignableRole = "admin" | "member";
 
-function getMembers(currentUser: { id: string; name: string; email: string } | null): Member[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
-  const defaults: Member[] = currentUser
-    ? [
-        {
-          id: currentUser.id,
-          name: currentUser.name,
-          email: currentUser.email,
-          role: ROLES.OWNER,
-          joinedAt: new Date().toISOString(),
-        },
-      ]
-    : [];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
-  return defaults;
-}
-
-function saveMembers(members: Member[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
-}
-
-function getAssignableRoles(role: Role): Role[] {
+function getAssignableRoles(role: Role): AssignableRole[] {
   if (role === ROLES.OWNER) return [ROLES.ADMIN, ROLES.MEMBER];
   if (role === ROLES.ADMIN) return [ROLES.MEMBER];
   return [];
 }
 
+const STATUS_CLASSES: Record<MemberRow["status"], string> = {
+  active: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  invited: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  inactive: "bg-muted text-muted-foreground",
+};
+
 export function RoleManagement() {
-  const [members, setMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<MemberRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<Role>(ROLES.MEMBER);
-  const currentUserRole: Role = ROLES.OWNER;
+  const [inviteRole, setInviteRole] = useState<AssignableRole>(ROLES.MEMBER);
+  const [isSaving, setIsSaving] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<Role>(ROLES.MEMBER);
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      let currentUser: { id: string; name: string; email: string } | null = null;
       try {
         const result = await getCurrentUser();
-        currentUser = result.user?.id ? { id: result.user.id, name: result.user.name ?? "", email: result.user.email } : null;
+        if (cancelled) return;
+        const ws = result.currentWorkspace;
+        if (!ws) {
+          setIsLoading(false);
+          return;
+        }
+        setWorkspaceId(ws.id);
+
+        const membersResult = await getWorkspaceMembers(ws.id);
+        if (membersResult.success) {
+          const selfId = result.user.id;
+          const selfMembership = membersResult.members.find((m) => m.user === selfId);
+          if (selfMembership) {
+            setCurrentUserRole(selfMembership.role);
+          }
+          setMembers(
+            membersResult.members.map((m) => ({
+              id: m.id,
+              user: m.user,
+              name: m.name ?? null,
+              email: m.email ?? null,
+              role: m.role,
+              status: m.status,
+              joinedAt: m.date_created,
+              isSelf: m.user === selfId,
+            })),
+          );
+        } else if (membersResult.error) {
+          toast.error(membersResult.error);
+        }
       } catch {
         // ignore
       }
-      if (!cancelled) {
-        setMembers(getMembers(currentUser));
-        setIsLoading(false);
-      }
+      if (!cancelled) setIsLoading(false);
     };
     void load();
     return () => {
@@ -107,44 +109,64 @@ export function RoleManagement() {
     };
   }, []);
 
-  function handleInvite(e: React.FormEvent) {
+  async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
-    if (!inviteEmail.trim()) return;
+    if (!inviteEmail.trim() || !workspaceId) return;
+    setIsSaving(true);
 
-    const newMember: Member = {
-      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      name: inviteEmail.split("@")[0],
+    const result = await inviteMember(workspaceId, {
       email: inviteEmail.trim(),
       role: inviteRole,
-      joinedAt: new Date().toISOString(),
-    };
+    });
 
-    const updated = [...members, newMember];
-    setMembers(updated);
-    saveMembers(updated);
+    setIsSaving(false);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+
+    setMembers((prev) => [
+      ...prev,
+      {
+        id: `pending-${Date.now()}`,
+        user: inviteEmail.trim(),
+        name: null,
+        email: inviteEmail.trim(),
+        role: inviteRole,
+        status: "invited",
+        joinedAt: new Date().toISOString(),
+        isSelf: false,
+      },
+    ]);
     setInviteEmail("");
     setInviteRole(ROLES.MEMBER);
     setInviteOpen(false);
-    toast.success(`Invitation sent to ${inviteEmail}`);
+    toast.success(`Invitation sent to ${inviteEmail.trim()}`);
   }
 
-  function handleRoleChange(memberId: string, newRole: Role) {
+  async function handleRoleChange(memberId: string, newRole: AssignableRole) {
+    if (!workspaceId) return;
     if (!hasPermission(currentUserRole, PERMISSIONS.MEMBERS_CHANGE_ROLE)) {
       toast.error("You don't have permission to change roles.");
       return;
     }
-    const updated = members.map((m) =>
-      m.id === memberId ? { ...m, role: newRole } : m,
-    );
-    setMembers(updated);
-    saveMembers(updated);
+    const result = await updateMemberRole(workspaceId, { membershipId: memberId, role: newRole });
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setMembers((prev) => prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m)));
     toast.success("Role updated successfully");
   }
 
-  function handleRemoveMember(memberId: string) {
-    const updated = members.filter((m) => m.id !== memberId);
-    setMembers(updated);
-    saveMembers(updated);
+  async function handleRemoveMember(memberId: string) {
+    if (!workspaceId) return;
+    const result = await removeMember(workspaceId, { membershipId: memberId });
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setMembers((prev) => prev.filter((m) => m.id !== memberId));
     toast.success("Member removed from workspace");
   }
 
@@ -156,6 +178,9 @@ export function RoleManagement() {
     );
   }
 
+  const canInvite = hasPermission(currentUserRole, PERMISSIONS.MEMBERS_INVITE);
+  const canChangeRole = hasPermission(currentUserRole, PERMISSIONS.MEMBERS_CHANGE_ROLE);
+  const canRemove = hasPermission(currentUserRole, PERMISSIONS.MEMBERS_REMOVE);
   const assignableRoles = getAssignableRoles(currentUserRole);
 
   return (
@@ -164,23 +189,21 @@ export function RoleManagement() {
         <div>
           <h3 className="font-medium">Team Members</h3>
           <p className="text-muted-foreground text-sm">
-            Manage who has access to this workspace.
+            Manage who has access to this workspace. Owners and Managers can invite members.
           </p>
         </div>
-        {hasPermission(currentUserRole, PERMISSIONS.MEMBERS_INVITE) && (
+        {canInvite && (
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
               <Button size="sm">
                 <UserPlus />
-                Invite
+                Invite Member
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Invite team member</DialogTitle>
-                <DialogDescription>
-                  Invite a new member to collaborate on this workspace.
-                </DialogDescription>
+                <DialogDescription>Invite a new member to collaborate on this workspace.</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleInvite} className="space-y-4">
                 <div className="space-y-2">
@@ -196,7 +219,7 @@ export function RoleManagement() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="invite-role">Role</Label>
-                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as Role)}>
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as AssignableRole)}>
                     <SelectTrigger id="invite-role">
                       <SelectValue />
                     </SelectTrigger>
@@ -205,7 +228,11 @@ export function RoleManagement() {
                         <SelectItem key={role} value={role}>
                           <div>
                             <p>{ROLE_LABELS[role]}</p>
-                            <p className="text-muted-foreground text-xs">{ROLE_DESCRIPTIONS[role]}</p>
+                            <p className="text-muted-foreground text-xs">
+                              {role === ROLES.ADMIN
+                                ? "Manage agents, knowledge, conversations, leads, and bookings"
+                                : "View conversations, take over chats, and see customer information"}
+                            </p>
                           </div>
                         </SelectItem>
                       ))}
@@ -213,10 +240,13 @@ export function RoleManagement() {
                   </Select>
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => setInviteOpen(false)} disabled={isSaving}>
                     Cancel
                   </Button>
-                  <Button type="submit">Send Invitation</Button>
+                  <Button type="submit" disabled={isSaving || !inviteEmail.trim()}>
+                    {isSaving && <Loader2 className="size-4 animate-spin" />}
+                    Send Invitation
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -224,75 +254,98 @@ export function RoleManagement() {
         )}
       </div>
 
-      <div className="rounded-lg border">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium text-sm">Member</th>
-              <th className="px-4 py-3 text-left font-medium text-sm">Role</th>
-              <th className="px-4 py-3 text-left font-medium text-sm">Joined</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {members.map((member) => (
-              <tr key={member.id} className="border-b">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="size-8">
-                      <AvatarFallback className="text-xs">
-                        {member.name.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-sm">{member.name}</p>
-                      <p className="text-muted-foreground text-xs">{member.email}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  {hasPermission(currentUserRole, PERMISSIONS.MEMBERS_CHANGE_ROLE) && member.id !== "dev-user-123" ? (
-                    <Select
-                      value={member.role}
-                      onValueChange={(v) => handleRoleChange(member.id, v as Role)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {assignableRoles.map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {ROLE_LABELS[role]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs">
-                      <Shield className="size-3" />
-                      {ROLE_LABELS[member.role]}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground text-sm">
-                  {new Date(member.joinedAt).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {hasPermission(currentUserRole, PERMISSIONS.MEMBERS_REMOVE) && member.id !== "dev-user-123" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemoveMember(member.id)}
-                    >
-                      <UserMinus className="size-4" />
-                    </Button>
-                  )}
-                </td>
+      {members.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
+          <Mail className="size-10 text-muted-foreground" />
+          <p className="mt-3 font-medium">No team members yet</p>
+          <p className="text-muted-foreground text-sm">Invite members to collaborate on this workspace.</p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="px-4 py-3 text-left font-medium text-sm">Member</th>
+                <th className="px-4 py-3 text-left font-medium text-sm">Role</th>
+                <th className="px-4 py-3 text-left font-medium text-sm">Status</th>
+                <th className="px-4 py-3 text-left font-medium text-sm">Joined</th>
+                <th className="px-4 py-3" />
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {members.map((member) => {
+                const displayName = member.name ?? (member.email ? member.email.split("@")[0] : "Invited");
+                return (
+                  <tr key={member.id} className="border-b">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="size-8">
+                          <AvatarFallback className="text-xs">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-sm">
+                            {displayName}
+                            {member.isSelf && <span className="ml-2 text-muted-foreground text-xs">(you)</span>}
+                          </p>
+                          <p className="text-muted-foreground text-xs">{member.email ?? "Awaiting activation"}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {canChangeRole && !member.isSelf && member.role !== ROLES.OWNER ? (
+                        <Select
+                          value={member.role}
+                          onValueChange={(v) => handleRoleChange(member.id, v as AssignableRole)}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getAssignableRoles(currentUserRole).map((role) => (
+                              <SelectItem key={role} value={role}>
+                                {ROLE_LABELS[role]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs">
+                          {member.role === ROLES.OWNER ? (
+                            <Shield className="size-3 text-primary" />
+                          ) : (
+                            <User className="size-3" />
+                          )}
+                          {ROLE_LABELS[member.role]}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs ${STATUS_CLASSES[member.status]}`}>
+                        {member.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-sm">
+                      {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {canRemove && !member.isSelf && member.role !== ROLES.OWNER && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveMember(member.id)}
+                          title="Remove member"
+                        >
+                          <UserMinus className="size-4" />
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

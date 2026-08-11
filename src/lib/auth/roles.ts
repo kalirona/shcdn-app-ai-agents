@@ -8,14 +8,14 @@ export type Role = (typeof ROLES)[keyof typeof ROLES];
 
 export const ROLE_LABELS: Record<Role, string> = {
   [ROLES.OWNER]: "Owner",
-  [ROLES.ADMIN]: "Admin",
-  [ROLES.MEMBER]: "Member",
+  [ROLES.ADMIN]: "Manager",
+  [ROLES.MEMBER]: "Agent",
 };
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  [ROLES.OWNER]: "Full control — billing, team, settings, delete workspace",
-  [ROLES.ADMIN]: "Manage agents, knowledge, conversations, invite members",
-  [ROLES.MEMBER]: "Create agents, add knowledge, view conversations",
+  [ROLES.OWNER]: "Full control - billing, members, organization settings, delete workspace",
+  [ROLES.ADMIN]: "Manage agents, knowledge, conversations, leads, and bookings",
+  [ROLES.MEMBER]: "View conversations, take over chats, and see relevant customer information",
 };
 
 export const PERMISSIONS = {
@@ -31,9 +31,13 @@ export const PERMISSIONS = {
 
   CONVERSATIONS_READ: "conversations:read",
   CONVERSATIONS_EXPORT: "conversations:export",
+  CONVERSATIONS_TAKEOVER: "conversations:takeover",
 
   LEADS_READ: "leads:read",
   LEADS_MANAGE: "leads:manage",
+
+  CUSTOMERS_READ: "customers:read",
+  BOOKINGS_MANAGE: "bookings:manage",
 
   ANALYTICS_READ: "analytics:read",
 
@@ -62,23 +66,20 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     PERMISSIONS.KNOWLEDGE_DELETE,
     PERMISSIONS.CONVERSATIONS_READ,
     PERMISSIONS.CONVERSATIONS_EXPORT,
+    PERMISSIONS.CONVERSATIONS_TAKEOVER,
     PERMISSIONS.LEADS_READ,
     PERMISSIONS.LEADS_MANAGE,
+    PERMISSIONS.CUSTOMERS_READ,
+    PERMISSIONS.BOOKINGS_MANAGE,
     PERMISSIONS.ANALYTICS_READ,
-    PERMISSIONS.MEMBERS_INVITE,
-    PERMISSIONS.MEMBERS_REMOVE,
-    PERMISSIONS.MEMBERS_CHANGE_ROLE,
     PERMISSIONS.SETTINGS_UPDATE,
   ],
 
   [ROLES.MEMBER]: [
-    PERMISSIONS.AGENTS_CREATE,
-    PERMISSIONS.AGENTS_READ,
-    PERMISSIONS.AGENTS_UPDATE,
-    PERMISSIONS.KNOWLEDGE_CREATE,
-    PERMISSIONS.KNOWLEDGE_READ,
     PERMISSIONS.CONVERSATIONS_READ,
+    PERMISSIONS.CONVERSATIONS_TAKEOVER,
     PERMISSIONS.LEADS_READ,
+    PERMISSIONS.CUSTOMERS_READ,
     PERMISSIONS.ANALYTICS_READ,
   ],
 };
@@ -93,4 +94,8 @@ export function canInvite(role: Role): boolean {
 
 export function canManageBilling(role: Role): boolean {
   return hasPermission(role, PERMISSIONS.BILLING_MANAGE);
+}
+
+export function canManageAgents(role: Role): boolean {
+  return hasPermission(role, PERMISSIONS.AGENTS_CREATE) || hasPermission(role, PERMISSIONS.AGENTS_UPDATE);
 }

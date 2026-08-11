@@ -17,13 +17,31 @@ export const changePlanSchema = z.object({
 
 export const recordUsageSchema = z.object({
   workspaceId: z.string().min(1),
-  metric: z.enum(["ai_messages", "ai_tokens", "conversations", "agents", "knowledge_storage", "documents", "team_members", "bookings"] as [string, ...string[]]),
+  metric: z.enum([
+    "ai_messages",
+    "ai_tokens",
+    "conversations",
+    "agents",
+    "knowledge_storage",
+    "documents",
+    "team_members",
+    "bookings",
+  ] as [string, ...string[]]),
   amount: z.number().min(1),
 });
 
 export const usageLimitCheckSchema = z.object({
   workspaceId: z.string().min(1),
-  metric: z.enum(["ai_messages", "ai_tokens", "conversations", "agents", "knowledge_storage", "documents", "team_members", "bookings"]),
+  metric: z.enum([
+    "ai_messages",
+    "ai_tokens",
+    "conversations",
+    "agents",
+    "knowledge_storage",
+    "documents",
+    "team_members",
+    "bookings",
+  ]),
 });
 
 export const webhookEventSchema = z.object({

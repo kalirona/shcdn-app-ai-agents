@@ -25,13 +25,18 @@ export async function getCurrentUser(): Promise<CurrentUserResult> {
   // Auto-provision a default workspace + owner membership for brand-new users
   // so the dashboard always has a real organization tied to the authenticated user.
   if (workspaces.length === 0) {
-    const baseName = user.name?.trim() ? user.name.trim() : user.email.split("@")[0] ?? "My";
-    const slug = `${baseName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}-workspace`.slice(0, 64);
+    const baseName = user.name?.trim() ? user.name.trim() : (user.email.split("@")[0] ?? "My");
+    const slug = `${baseName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")}-workspace`.slice(0, 64);
     try {
       const created = await createWorkspaceWithOwner({
         name: `${baseName}'s Workspace`,
         slug,
         ownerId: user.id,
+        ownerEmail: user.email,
+        ownerName: user.name ?? null,
       });
       workspaces = [created];
     } catch {

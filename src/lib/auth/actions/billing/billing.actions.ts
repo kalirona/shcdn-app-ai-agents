@@ -3,11 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getAuthContext } from "@/lib/auth/auth-context";
-import {
-  PLAN_LIMITS,
-  PLAN_PRICES,
-  type PlanName,
-} from "@/lib/auth/schemas/billing.schema";
+import { PLAN_LIMITS, PLAN_PRICES, type PlanName } from "@/lib/auth/schemas/billing.schema";
 import { getProvider } from "@/lib/billing/provider";
 import { checkRateLimit } from "@/lib/security/rate-limiter";
 
@@ -19,10 +15,7 @@ async function requireAuth() {
   return user;
 }
 
-export async function createCheckoutSession(
-  plan: PlanName,
-  paymentProvider: "stripe" | "paypal" | "lemon_squeezy",
-) {
+export async function createCheckoutSession(plan: PlanName, paymentProvider: "stripe" | "paypal" | "lemon_squeezy") {
   const user = await requireAuth();
 
   const rateLimit = checkRateLimit(`checkout:${user.id}`, 5, 60000);
@@ -32,11 +25,7 @@ export async function createCheckoutSession(
 
   try {
     const provider = getProvider(paymentProvider);
-    const session = await provider.createCheckoutSession(
-      plan,
-      "placeholder-workspace-id",
-      user.email,
-    );
+    const session = await provider.createCheckoutSession(plan, "placeholder-workspace-id", user.email);
 
     return { success: true, url: session.url, sessionId: session.sessionId };
   } catch (error) {
@@ -125,10 +114,7 @@ export async function createCustomerPortalSession(workspaceId: string) {
   }
 }
 
-export async function checkUsageLimit(
-  workspaceId: string,
-  metric: keyof typeof PLAN_LIMITS.starter,
-) {
+export async function checkUsageLimit(workspaceId: string, metric: keyof typeof PLAN_LIMITS.starter) {
   await requireAuth();
 
   try {
@@ -154,11 +140,7 @@ export async function checkUsageLimit(
   }
 }
 
-export async function recordUsage(
-  workspaceId: string,
-  metric: string,
-  amount: number,
-) {
+export async function recordUsage(workspaceId: string, metric: string, amount: number) {
   await requireAuth();
 
   try {

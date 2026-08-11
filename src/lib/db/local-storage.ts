@@ -124,7 +124,9 @@ export const localDb = {
   },
 
   knowledge: {
-    create(data: Omit<KnowledgeSourceEntity, "id" | "date_created" | "date_updated" | "status" | "chunk_count">): KnowledgeSourceEntity {
+    create(
+      data: Omit<KnowledgeSourceEntity, "id" | "date_created" | "date_updated" | "status" | "chunk_count">,
+    ): KnowledgeSourceEntity {
       const source: KnowledgeSourceEntity = {
         ...data,
         id: generateId(),

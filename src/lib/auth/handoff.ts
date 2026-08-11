@@ -70,15 +70,7 @@ export function detectHandoffNeed(message: string): HandoffState {
     "doesn't make sense",
   ];
 
-  const complexPhrases = [
-    "legal",
-    "refund",
-    "complaint",
-    "lawyer",
-    "sue",
-    "cancel my account",
-    "delete my data",
-  ];
+  const complexPhrases = ["legal", "refund", "complaint", "lawyer", "sue", "cancel my account", "delete my data"];
 
   for (const phrase of explicitPhrases) {
     if (lowerMessage.includes(phrase)) {
@@ -122,8 +114,7 @@ export function shouldAIRespond(conversationStatus: ConversationStatus): boolean
 
 export function shouldNotifyBusiness(conversationStatus: ConversationStatus): boolean {
   return (
-    conversationStatus === CONVERSATION_STATUS.HUMAN_REQUIRED ||
-    conversationStatus === CONVERSATION_STATUS.WITH_HUMAN
+    conversationStatus === CONVERSATION_STATUS.HUMAN_REQUIRED || conversationStatus === CONVERSATION_STATUS.WITH_HUMAN
   );
 }
 

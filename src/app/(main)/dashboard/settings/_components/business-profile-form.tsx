@@ -10,19 +10,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { getCurrentUser } from "@/lib/auth/actions/user.actions";
 import { updateWorkspace } from "@/lib/auth/actions/workspace.actions";
 
-const WORKSPACE_ID = "placeholder-workspace-id";
-
 export function BusinessProfileForm() {
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
-    // TODO: Load from Directus
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const result = await getCurrentUser();
+        if (cancelled) return;
+        const ws = result.currentWorkspace;
+        if (ws) {
+          setWorkspaceId(ws.id);
+          setName(ws.name);
+        }
+      } catch {
+        // ignore
+      }
+      if (!cancelled) setIsLoading(false);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function markDirty() {
@@ -31,9 +50,10 @@ export function BusinessProfileForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsLoading(true);
+    if (!workspaceId) return;
+    setIsSaving(true);
 
-    const result = await updateWorkspace(WORKSPACE_ID, {
+    const result = await updateWorkspace(workspaceId, {
       name: name || undefined,
       description: description || undefined,
       website: website || undefined,
@@ -46,7 +66,7 @@ export function BusinessProfileForm() {
       setIsDirty(false);
     }
 
-    setIsLoading(false);
+    setIsSaving(false);
   }
 
   return (
@@ -69,7 +89,7 @@ export function BusinessProfileForm() {
                 setName(e.target.value);
                 markDirty();
               }}
-              disabled={isLoading}
+              disabled={isLoading || isSaving}
             />
           </div>
           <div className="space-y-2">
@@ -82,7 +102,7 @@ export function BusinessProfileForm() {
                 setDescription(e.target.value);
                 markDirty();
               }}
-              disabled={isLoading}
+              disabled={isLoading || isSaving}
               rows={3}
             />
           </div>
@@ -99,14 +119,14 @@ export function BusinessProfileForm() {
                   setWebsite(e.target.value);
                   markDirty();
                 }}
-                disabled={isLoading}
+                disabled={isLoading || isSaving}
                 className="pl-8"
               />
             </div>
           </div>
           <div className="flex justify-end">
-            <Button type="submit" disabled={isLoading || !isDirty}>
-              {isLoading && <Loader2 className="size-4 animate-spin" />}
+            <Button type="submit" disabled={isLoading || isSaving || !isDirty || !workspaceId}>
+              {isSaving && <Loader2 className="size-4 animate-spin" />}
               <Save />
               Save changes
             </Button>

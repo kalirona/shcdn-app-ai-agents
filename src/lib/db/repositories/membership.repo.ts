@@ -5,15 +5,28 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<Membersh
   return db.membership.getByWorkspace(workspaceId);
 }
 
+export async function getMembershipById(membershipId: string): Promise<MembershipEntity | null> {
+  try {
+    return await db.membership.getById(membershipId);
+  } catch {
+    return null;
+  }
+}
+
 export async function inviteWorkspaceMember(
   workspaceId: string,
-  userId: string,
+  user: string,
   role: "admin" | "member",
+  email?: string,
+  name?: string,
 ): Promise<MembershipEntity> {
   return db.membership.create({
     workspace: workspaceId,
-    user: userId,
+    user,
     role,
+    email: email ?? user,
+    name: name ?? null,
+    status: "invited",
   });
 }
 
@@ -29,4 +42,15 @@ export async function getUserRole(workspaceId: string, userId: string): Promise<
   const memberships = await db.membership.getByWorkspace(workspaceId);
   const membership = memberships.find((m) => m.user === userId);
   return membership?.role ?? null;
+}
+
+/** Finds an invited membership by email so it can be activated on sign-in. */
+export async function findInviteByEmail(email: string): Promise<MembershipEntity | null> {
+  const memberships = await db.membership.getByUser(email);
+  return memberships.find((m) => m.status === "invited") ?? null;
+}
+
+/** Activates an invited membership, linking it to the real Logto user id. */
+export async function activateInvite(membershipId: string, userId: string): Promise<MembershipEntity> {
+  return db.membership.update(membershipId, { user: userId, status: "active" });
 }

@@ -115,6 +115,8 @@ await timestamps("workspaces");
 await col("memberships", "group", "Workspace memberships linking users to workspaces");
 await field("memberships", m2o("workspace", "workspaces"));
 await field("memberships", { field: "user", type: "string", schema: { is_nullable: false }, meta: { interface: "input", note: "Logto user ID", required: true } });
+await field("memberships", { field: "email", type: "string", schema: { is_nullable: true, max_length: 256 }, meta: { interface: "input", note: "Member email" } });
+await field("memberships", { field: "name", type: "string", schema: { is_nullable: true, max_length: 128 }, meta: { interface: "input", note: "Member display name" } });
 await field("memberships", { field: "role", type: "string", schema: { is_nullable: false, default_value: "member" }, meta: sel([
   { text: "Owner", value: "owner" }, { text: "Admin", value: "admin" }, { text: "Member", value: "member" },
 ]) });
@@ -208,6 +210,114 @@ await field("messages", { field: "sources", type: "json", schema: { is_nullable:
 await field("messages", { field: "metadata", type: "json", schema: { is_nullable: true, default_value: {} }, meta: { interface: "input-code", special: ["cast-json"] } });
 await rel("messages", "conversation", "conversations");
 await timestamps("messages");
+
+console.log("\n-- RLS roles, policies & permissions --");
+
+const APP_COLLECTIONS = ["workspaces", "memberships", "agents", "knowledge_sources", "knowledge_chunks", "conversations", "messages"];
+
+const ROLE_DEFS = [
+  { key: "app_owner", name: "App Owner" },
+  { key: "app_manager", name: "App Manager" },
+  { key: "app_agent", name: "App Agent" },
+];
+
+async function getOrCreateRole(def) {
+  const roles = await api("GET", `/roles?limit=-1`);
+  const existing = roles.find((r) => r.name === def.name);
+  if (existing) { console.log(`= role "${def.key}" exists, skip`); return existing.id; }
+  const created = await api("POST", "/roles", { key: def.key, name: def.name, admin_access: false, app_access: true });
+  console.log(`+ role "${def.key}"`);
+  return created.id;
+}
+
+async function getOrCreatePolicy(name) {
+  const policies = await api("GET", `/policies?limit=-1`);
+  const existing = policies.find((p) => p.name === name);
+  if (existing) { console.log(`= policy "${name}" exists, skip`); return existing.id; }
+  const created = await api("POST", "/policies", {
+    name,
+    app_access: true,
+    admin_access: false,
+    enforce_tfa: false,
+  });
+  console.log(`+ policy "${name}"`);
+  return created.id;
+}
+
+async function ensureAccess(roleId, policyId) {
+  const access = await api("GET", `/access?limit=-1`);
+  const existing = access.find((a) => a.role === roleId && a.policy === policyId);
+  if (existing) { console.log(`= access ${roleId} -> ${policyId} exists, skip`); return; }
+  await api("POST", "/access", { role: roleId, policy: policyId });
+  console.log(`+ access ${roleId} -> ${policyId}`);
+}
+
+async function ensurePermission(policyId, collection, action, fields, permissions, validation) {
+  const perms = await api("GET", `/permissions?limit=-1`);
+  const existing = perms.find(
+    (p) => p.policy === policyId && p.collection === collection && p.action === action,
+  );
+  if (existing) { console.log(`  = permission ${collection}.${action} exists, skip`); return; }
+  const body = { policy: policyId, collection, action };
+  if (fields) body.fields = fields;
+  // Custom filter rules are feature-gated on this Directus instance, so grants
+  // are coarse-grained full access here. True row-level security is enforced at
+  // the app layer via requireWorkspaceAccess() + workspace memberships.
+  if (validation) body.validation = validation;
+  await api("POST", "/permissions", body);
+  console.log(`  + permission ${collection}.${action}`);
+}
+
+const ALL_FIELDS = ["*"];
+const READ_ONLY = ["*"];
+async function configureRls() {
+  const roleIds = {};
+  const policyIds = {};
+
+  for (const def of ROLE_DEFS) {
+    const roleId = await getOrCreateRole(def);
+    const policyId = await getOrCreatePolicy(def.name);
+    await ensureAccess(roleId, policyId);
+    roleIds[def.key] = roleId;
+    policyIds[def.key] = policyId;
+  }
+
+  const ownerPolicy = policyIds.app_owner;
+  const managerPolicy = policyIds.app_manager;
+  const agentPolicy = policyIds.app_agent;
+
+  for (const collection of APP_COLLECTIONS) {
+    // Owner: full access
+    for (const action of ["create", "read", "update", "delete"]) {
+      await ensurePermission(ownerPolicy, collection, action, ALL_FIELDS);
+    }
+
+    if (collection === "workspaces") {
+      await ensurePermission(managerPolicy, collection, "read", ALL_FIELDS);
+      await ensurePermission(managerPolicy, collection, "update", ALL_FIELDS);
+      await ensurePermission(agentPolicy, collection, "read", ALL_FIELDS);
+      continue;
+    }
+
+    if (collection === "memberships") {
+      await ensurePermission(managerPolicy, collection, "read", ALL_FIELDS);
+      await ensurePermission(agentPolicy, collection, "read", ALL_FIELDS);
+      continue;
+    }
+
+    // Manager: full CRUD on content collections (agents, knowledge, conversations, messages)
+    for (const action of ["create", "read", "update", "delete"]) {
+      await ensurePermission(managerPolicy, collection, action, ALL_FIELDS);
+    }
+
+    // Agent: read-only on conversations, messages, agents, and knowledge
+    if (["conversations", "messages", "agents", "knowledge_sources", "knowledge_chunks"].includes(collection)) {
+      await ensurePermission(agentPolicy, collection, "read", ALL_FIELDS);
+    }
+  }
+}
+
+await configureRls();
 
 console.log("\nDone!");
 console.log(`  Collections: ${c} created`);

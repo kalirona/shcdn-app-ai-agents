@@ -7,6 +7,8 @@ export interface CreateWorkspaceParams {
   description?: string;
   website?: string;
   ownerId: string;
+  ownerEmail?: string | null;
+  ownerName?: string | null;
 }
 
 function slugifyName(name: string): string {
@@ -51,6 +53,8 @@ export async function createWorkspaceWithOwner(params: CreateWorkspaceParams) {
     workspace: workspace.id,
     user: params.ownerId,
     role: "owner",
+    email: params.ownerEmail ?? null,
+    name: params.ownerName ?? null,
   });
 
   return workspace;

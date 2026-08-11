@@ -31,6 +31,6 @@ export interface User {
 
 export const ROLE_LABELS: Record<WorkspaceRole, string> = {
   owner: "Owner",
-  admin: "Admin",
-  member: "Member",
+  admin: "Manager",
+  member: "Agent",
 };

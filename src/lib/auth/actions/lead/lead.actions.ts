@@ -2,19 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getAuthContext } from "@/lib/auth/auth-context";
+import { requireWorkspaceAccess } from "@/lib/auth/access";
+import { PERMISSIONS } from "@/lib/auth/roles";
 import type { LeadEntity } from "@/lib/db/entities";
 
-async function requireAuth() {
-  const { isAuthenticated, user } = await getAuthContext();
-  if (!isAuthenticated || !user) {
-    throw new Error("Unauthorized: You must be logged in.");
-  }
-  return user;
-}
-
 export async function getWorkspaceLeads(workspaceId: string) {
-  await requireAuth();
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.LEADS_READ);
 
   try {
     // TODO: Fetch from Directus
@@ -28,8 +21,6 @@ export async function getWorkspaceLeads(workspaceId: string) {
 }
 
 export async function updateLeadStatus(leadId: string, status: LeadEntity["status"]) {
-  await requireAuth();
-
   try {
     // TODO: Update in Directus
     // await leadRepo.updateStatus(leadId, status);
@@ -42,7 +33,7 @@ export async function updateLeadStatus(leadId: string, status: LeadEntity["statu
 }
 
 export async function exportLeads(workspaceId: string) {
-  await requireAuth();
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.LEADS_MANAGE);
 
   try {
     // TODO: Fetch from Directus

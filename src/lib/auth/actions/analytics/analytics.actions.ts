@@ -1,15 +1,8 @@
 "use server";
 
-import { getAuthContext } from "@/lib/auth/auth-context";
-import { analyticsQuerySchema, agentAnalyticsSchema } from "@/lib/auth/schemas/analytics.schema";
-
-async function requireAuth() {
-  const { isAuthenticated, user } = await getAuthContext();
-  if (!isAuthenticated || !user) {
-    throw new Error("Unauthorized: You must be logged in.");
-  }
-  return user;
-}
+import { requireWorkspaceAccess } from "@/lib/auth/access";
+import { PERMISSIONS } from "@/lib/auth/roles";
+import { agentAnalyticsSchema, analyticsQuerySchema } from "@/lib/auth/schemas/analytics.schema";
 
 export interface AnalyticsKPIs {
   totalConversations: number;
@@ -32,7 +25,7 @@ export interface UnansweredQuestion {
 }
 
 export async function getWorkspaceAnalytics(workspaceId: string) {
-  await requireAuth();
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.ANALYTICS_READ);
 
   try {
     // TODO: Aggregate from Directus
@@ -62,9 +55,13 @@ export async function getWorkspaceAnalytics(workspaceId: string) {
 }
 
 export async function getAgentAnalytics(agentId: string) {
-  await requireAuth();
-
   try {
+    const agentRepo = await import("@/lib/db/repositories/agent.repo");
+    const agent = await agentRepo.getAgentById(agentId);
+    if (agent) {
+      await requireWorkspaceAccess(agent.workspace, PERMISSIONS.ANALYTICS_READ);
+    }
+
     // TODO: Aggregate from Directus
     const kpis: AnalyticsKPIs = {
       totalConversations: 0,
