@@ -13,6 +13,7 @@ import {
   deleteSourceSchema,
   getAgentSourcesSchema,
 } from "@/lib/auth/schemas/knowledge.schema";
+import { enforceDocumentLimit } from "@/lib/billing/usage-enforcement";
 import * as knowledgeRepo from "@/lib/db/repositories/knowledge.repo";
 import { chunkText } from "@/lib/security/chunking";
 import { checkRateLimit } from "@/lib/security/rate-limiter";
@@ -35,6 +36,11 @@ export async function addWebsiteSource(data: z.infer<typeof addWebsiteSourceSche
     const urlCheck = isAllowedUrl(parsed.data.url);
     if (!urlCheck.allowed) {
       return { error: urlCheck.error };
+    }
+
+    const limitCheck = await enforceDocumentLimit(parsed.data.workspaceId);
+    if (!limitCheck.allowed) {
+      return { error: limitCheck.error ?? "Document limit reached." };
     }
 
     const source = await knowledgeRepo.createKnowledgeSource({
@@ -87,6 +93,11 @@ export async function addDocumentSource(formData: FormData, workspaceId: string,
       return { error: `File type "${file.type}" is not supported.` };
     }
 
+    const limitCheck = await enforceDocumentLimit(workspaceId);
+    if (!limitCheck.allowed) {
+      return { error: limitCheck.error ?? "Document limit reached." };
+    }
+
     // TODO: Upload to R2, then process
     // For now, create the source record
     const source = await knowledgeRepo.createKnowledgeSource({
@@ -116,6 +127,11 @@ export async function addTextSource(data: z.infer<typeof addTextSourceSchema>) {
 
   try {
     await requireWorkspaceAccess(parsed.data.workspaceId, PERMISSIONS.KNOWLEDGE_CREATE);
+
+    const limitCheck = await enforceDocumentLimit(parsed.data.workspaceId);
+    if (!limitCheck.allowed) {
+      return { error: limitCheck.error ?? "Document limit reached." };
+    }
 
     const source = await knowledgeRepo.createKnowledgeSource({
       workspace: parsed.data.workspaceId,
@@ -149,6 +165,11 @@ export async function addFaqSource(data: z.infer<typeof addFaqSourceSchema>) {
 
   try {
     await requireWorkspaceAccess(parsed.data.workspaceId, PERMISSIONS.KNOWLEDGE_CREATE);
+
+    const limitCheck = await enforceDocumentLimit(parsed.data.workspaceId);
+    if (!limitCheck.allowed) {
+      return { error: limitCheck.error ?? "Document limit reached." };
+    }
 
     const source = await knowledgeRepo.createKnowledgeSource({
       workspace: parsed.data.workspaceId,

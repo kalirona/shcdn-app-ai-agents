@@ -12,6 +12,7 @@ import {
   createCheckoutSession,
   getBillingStatus,
 } from "@/lib/auth/actions/billing/billing.actions";
+import { getCurrentUser } from "@/lib/auth/actions/user.actions";
 import { PLAN_LIMITS } from "@/lib/auth/schemas/billing.schema";
 
 const PLANS = [
@@ -68,18 +69,27 @@ export default function BillingPage() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<"stripe" | "paypal" | "lemon_squeezy">("stripe");
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadBilling = async () => {
       try {
-        const result = await getBillingStatus("placeholder-workspace-id");
-        if (result.usage && result.limits) {
+        const user = await getCurrentUser();
+        const ws = user.currentWorkspace;
+        if (!ws) {
+          return;
+        }
+        setWorkspaceId(ws.id);
+        const result = await getBillingStatus(ws.id);
+        if (!cancelled && result.usage && result.limits) {
           setBillingStatus({
             subscription: result.subscription,
             usage: result.usage,
             limits: result.limits,
           });
-        } else {
+        } else if (!cancelled) {
           setBillingStatus({
             subscription: null,
             usage: {
@@ -96,28 +106,41 @@ export default function BillingPage() {
           });
         }
       } catch {
-        setBillingStatus({
-          subscription: null,
-          usage: {
-            ai_messages: 0,
-            ai_tokens: 0,
-            conversations: 0,
-            agents: 0,
-            knowledge_storage: 0,
-            documents: 0,
-            team_members: 1,
-            bookings: 0,
-          },
-          limits: PLAN_LIMITS.starter,
-        });
+        if (!cancelled) {
+          setBillingStatus({
+            subscription: null,
+            usage: {
+              ai_messages: 0,
+              ai_tokens: 0,
+              conversations: 0,
+              agents: 0,
+              knowledge_storage: 0,
+              documents: 0,
+              team_members: 1,
+              bookings: 0,
+            },
+            limits: PLAN_LIMITS.starter,
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
     };
 
-    loadBilling();
+    void loadBilling();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleSubscribe(planId: "starter" | "business" | "pro") {
+    if (!workspaceId) {
+      toast.error("No active workspace.");
+      return;
+    }
     const result = await createCheckoutSession(planId, selectedProvider);
     if (result.error) {
       toast.error(result.error);
@@ -127,7 +150,11 @@ export default function BillingPage() {
   }
 
   async function handleCancel() {
-    const result = await cancelSubscription("placeholder-workspace-id");
+    if (!workspaceId) {
+      toast.error("No active workspace.");
+      return;
+    }
+    const result = await cancelSubscription(workspaceId);
     if (result.error) {
       toast.error(result.error);
     } else {
@@ -162,6 +189,13 @@ export default function BillingPage() {
               {Object.entries(billingStatus.usage).map(([key, value]) => {
                 const limit = (billingStatus.limits as Record<string, number>)[key] ?? 0;
                 const percentage = limit > 0 ? Math.min((value / limit) * 100, 100) : 0;
+                let barColor = "bg-green-500";
+                if (percentage > 50) {
+                  barColor = "bg-yellow-500";
+                }
+                if (percentage > 80) {
+                  barColor = "bg-red-500";
+                }
                 return (
                   <div key={key} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
@@ -174,9 +208,7 @@ export default function BillingPage() {
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div
-                        className={`h-full rounded-full transition-all ${
-                          percentage > 80 ? "bg-red-500" : percentage > 50 ? "bg-yellow-500" : "bg-green-500"
-                        }`}
+                        className={`h-full rounded-full transition-all ${barColor}`}
                         style={{ width: `${percentage}%` }}
                       />
                     </div>

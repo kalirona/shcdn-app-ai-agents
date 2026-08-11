@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireWorkspaceAccess } from "@/lib/auth/access";
 import { PERMISSIONS } from "@/lib/auth/roles";
+import { enforceBookingLimit } from "@/lib/billing/usage-enforcement";
 import type { BookingEntity } from "@/lib/db/entities";
 import * as bookingRepo from "@/lib/db/repositories/booking.repo";
 
@@ -52,6 +53,11 @@ export async function createBooking(data: {
 }) {
   try {
     await requireWorkspaceAccess(data.workspaceId, PERMISSIONS.BOOKINGS_MANAGE);
+
+    const limitCheck = await enforceBookingLimit(data.workspaceId);
+    if (!limitCheck.allowed) {
+      return { error: limitCheck.error ?? "Booking limit reached." };
+    }
 
     const booking = await bookingRepo.createBooking({
       workspace: data.workspaceId,

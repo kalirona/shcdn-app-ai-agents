@@ -7,6 +7,7 @@ import type { z } from "zod";
 import { requireWorkspaceAccess } from "@/lib/auth/access";
 import { PERMISSIONS } from "@/lib/auth/roles";
 import { createAgentSchema, updateAgentSchema } from "@/lib/auth/schemas/agent.schema";
+import { enforceAgentLimit } from "@/lib/billing/usage-enforcement";
 
 const isLocalDev = process.env.NODE_ENV === "development" && !process.env.DIRECTUS_URL;
 
@@ -18,7 +19,12 @@ export async function createAgent(workspaceId: string, data: z.infer<typeof crea
   }
 
   try {
-    let agent;
+    const limitCheck = await enforceAgentLimit(workspaceId);
+    if (!limitCheck.allowed) {
+      return { error: limitCheck.error ?? "Agent limit reached." };
+    }
+
+    let agent: { id: string; workspace: string } | null;
 
     if (isLocalDev) {
       const { localDb } = await import("@/lib/db/local-storage");
@@ -140,7 +146,7 @@ export async function getWorkspaceAgents(workspaceId: string) {
   await requireWorkspaceAccess(workspaceId, PERMISSIONS.AGENTS_READ);
 
   try {
-    let agents;
+    let agents: { id: string; workspace: string }[];
 
     if (isLocalDev) {
       const { localDb } = await import("@/lib/db/local-storage");

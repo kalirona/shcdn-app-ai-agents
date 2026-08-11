@@ -6,6 +6,14 @@ export interface WorkspaceEntity {
   logo: string | null;
   website: string | null;
   status: "active" | "suspended" | "archived";
+  plan: "starter" | "business" | "pro";
+  subscription_status: "free" | "trialing" | "active" | "past_due" | "canceled";
+  payment_provider: string | null;
+  payment_provider_subscription_id: string | null;
+  payment_provider_customer_id: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
   date_created: string;
   date_updated: string;
 }

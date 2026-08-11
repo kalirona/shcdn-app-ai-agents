@@ -13,6 +13,7 @@ import {
   updateMemberRoleSchema,
   updateWorkspaceSchema,
 } from "@/lib/auth/schemas/workspace.schema";
+import { enforceTeamMemberLimit } from "@/lib/billing/usage-enforcement";
 import * as membershipRepo from "@/lib/db/repositories/membership.repo";
 import * as workspaceRepo from "@/lib/db/repositories/workspace.repo";
 
@@ -96,6 +97,11 @@ export async function inviteMember(workspaceId: string, data: z.infer<typeof inv
     const existing = await membershipRepo.getWorkspaceMembers(workspaceId);
     if (existing.some((m) => m.user === parsed.data.email)) {
       return { error: "That user is already a member of this workspace." };
+    }
+
+    const limitCheck = await enforceTeamMemberLimit(workspaceId);
+    if (!limitCheck.allowed) {
+      return { error: limitCheck.error ?? "Team member limit reached." };
     }
 
     // Memberships are keyed by Logto user id. For invites we store the target

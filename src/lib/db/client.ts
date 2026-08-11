@@ -69,7 +69,23 @@ async function request<T>(path: string, options: RequestInit = {}, query?: Direc
 
 export const db = {
   workspace: {
-    create: (data: Omit<WorkspaceEntity, "id" | "date_created" | "date_updated" | "status">) =>
+    create: (
+      data: Omit<
+        WorkspaceEntity,
+        | "id"
+        | "date_created"
+        | "date_updated"
+        | "status"
+        | "plan"
+        | "subscription_status"
+        | "payment_provider"
+        | "payment_provider_subscription_id"
+        | "payment_provider_customer_id"
+        | "current_period_start"
+        | "current_period_end"
+        | "cancel_at_period_end"
+      >,
+    ) =>
       request<WorkspaceEntity>("/workspaces", {
         method: "POST",
         body: JSON.stringify({ ...data, status: "active" }),
@@ -279,6 +295,16 @@ export const db = {
         {},
         {
           filter: { conversation: { _eq: conversationId } },
+          sort: ["date_created"],
+        },
+      ),
+
+    getByConversations: (conversationIds: string[]) =>
+      request<MessageEntity[]>(
+        "/messages",
+        {},
+        {
+          filter: { conversation: { _in: conversationIds } },
           sort: ["date_created"],
         },
       ),

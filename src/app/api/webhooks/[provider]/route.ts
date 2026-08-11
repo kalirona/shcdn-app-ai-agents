@@ -1,11 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { getProvider } from "@/lib/billing/provider";
+import * as subscriptionRepo from "@/lib/db/repositories/subscription.repo";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ provider: string }> },
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider: providerName } = await params;
 
   if (!["stripe", "paypal", "lemon_squeezy"].includes(providerName)) {
@@ -34,7 +32,7 @@ export async function POST(
       return NextResponse.json({ received: true });
     }
 
-    await handleWebhookEvent(event);
+    await handleWebhookEvent(event, providerName);
 
     return NextResponse.json({ received: true });
   } catch (error) {
@@ -43,40 +41,72 @@ export async function POST(
   }
 }
 
-async function handleWebhookEvent(event: {
-  type: string;
-  workspaceId: string;
-  subscriptionId?: string;
-  plan?: "starter" | "business" | "pro";
-  amount?: number;
-  currency?: string;
-}) {
+async function handleWebhookEvent(
+  event: {
+    type: string;
+    workspaceId: string;
+    subscriptionId?: string;
+    plan?: "starter" | "business" | "pro";
+    amount?: number;
+    currency?: string;
+  },
+  providerName: string,
+) {
+  const { workspaceId, subscriptionId } = event;
+
+  if (!workspaceId) {
+    console.log("Webhook event without workspaceId, skipping:", event.type);
+    return;
+  }
+
   switch (event.type) {
     case "subscription.created":
-      // TODO: Create subscription record in Directus
-      // await subscriptionRepo.create({ workspaceId, plan, subscriptionId, status: "active" });
-      console.log("Subscription created:", event.workspaceId, event.plan);
+      await subscriptionRepo.updateSubscription(workspaceId, {
+        plan: event.plan ?? "starter",
+        status: "active",
+        paymentProvider: providerName,
+        paymentProviderSubscriptionId: subscriptionId ?? null,
+        cancelAtPeriodEnd: false,
+      });
+      console.log("Subscription created:", workspaceId, event.plan);
       break;
 
     case "subscription.updated":
-      // TODO: Update subscription in Directus
-      console.log("Subscription updated:", event.workspaceId);
+      await subscriptionRepo.updateSubscription(workspaceId, {
+        plan: event.plan,
+        paymentProviderSubscriptionId: subscriptionId,
+      });
+      console.log("Subscription updated:", workspaceId);
       break;
 
     case "subscription.canceled":
-      // TODO: Mark subscription as canceled in Directus
-      console.log("Subscription canceled:", event.workspaceId);
+      await subscriptionRepo.updateSubscription(workspaceId, {
+        status: "canceled",
+        cancelAtPeriodEnd: true,
+      });
+      console.log("Subscription canceled:", workspaceId);
+      break;
+
+    case "subscription.past_due":
+      await subscriptionRepo.updateSubscription(workspaceId, {
+        status: "past_due",
+      });
+      console.log("Subscription past due:", workspaceId);
       break;
 
     case "invoice.paid":
-      // TODO: Record payment in Directus
-      // await invoiceRepo.create({ workspaceId, amount, currency, status: "paid" });
-      console.log("Invoice paid:", event.workspaceId, event.amount);
+      // Reset subscription to active when an invoice is paid.
+      await subscriptionRepo.updateSubscription(workspaceId, {
+        status: "active",
+      });
+      console.log("Invoice paid:", workspaceId, event.amount, event.currency);
       break;
 
     case "invoice.payment_failed":
-      // TODO: Mark subscription as past_due
-      console.log("Payment failed:", event.workspaceId);
+      await subscriptionRepo.updateSubscription(workspaceId, {
+        status: "past_due",
+      });
+      console.log("Payment failed:", workspaceId);
       break;
 
     default:

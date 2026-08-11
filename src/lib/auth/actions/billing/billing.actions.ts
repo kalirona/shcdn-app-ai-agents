@@ -2,30 +2,35 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getAuthContext } from "@/lib/auth/auth-context";
-import { PLAN_LIMITS, PLAN_PRICES, type PlanName } from "@/lib/auth/schemas/billing.schema";
+import { requireWorkspaceAccess } from "@/lib/auth/access";
+import { getCurrentUser } from "@/lib/auth/actions/user.actions";
+import { PERMISSIONS } from "@/lib/auth/roles";
+import { PLAN_LIMITS, type PlanName } from "@/lib/auth/schemas/billing.schema";
 import { getProvider } from "@/lib/billing/provider";
+import * as subscriptionRepo from "@/lib/db/repositories/subscription.repo";
+import { getWorkspaceUsage } from "@/lib/db/repositories/usage.repo";
 import { checkRateLimit } from "@/lib/security/rate-limiter";
 
-async function requireAuth() {
-  const { isAuthenticated, user } = await getAuthContext();
-  if (!isAuthenticated || !user) {
+async function getCurrentContext() {
+  const current = await getCurrentUser();
+  if (!current.user.id || !current.currentWorkspace) {
     throw new Error("Unauthorized: You must be logged in.");
   }
-  return user;
+  return { userId: current.user.id, email: current.user.email, workspaceId: current.currentWorkspace.id };
 }
 
 export async function createCheckoutSession(plan: PlanName, paymentProvider: "stripe" | "paypal" | "lemon_squeezy") {
-  const user = await requireAuth();
+  const { userId, email, workspaceId } = await getCurrentContext();
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.SETTINGS_UPDATE);
 
-  const rateLimit = checkRateLimit(`checkout:${user.id}`, 5, 60000);
+  const rateLimit = checkRateLimit(`checkout:${userId}`, 5, 60000);
   if (!rateLimit.allowed) {
     return { error: "Too many checkout attempts. Please wait before trying again." };
   }
 
   try {
     const provider = getProvider(paymentProvider);
-    const session = await provider.createCheckoutSession(plan, "placeholder-workspace-id", user.email);
+    const session = await provider.createCheckoutSession(plan, workspaceId, email);
 
     return { success: true, url: session.url, sessionId: session.sessionId };
   } catch (error) {
@@ -35,27 +40,18 @@ export async function createCheckoutSession(plan: PlanName, paymentProvider: "st
 }
 
 export async function getBillingStatus(workspaceId: string) {
-  await requireAuth();
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.SETTINGS_UPDATE);
 
   try {
-    // TODO: Fetch from Directus
-    // const subscription = await subscriptionRepo.getByWorkspace(workspaceId);
-    // const usage = await usageRepo.getCurrentUsage(workspaceId);
+    const subscription = await subscriptionRepo.getSubscriptionByWorkspace(workspaceId);
+    const usage = await getWorkspaceUsage(workspaceId);
+    const plan = subscription?.plan ?? "starter";
 
     return {
       success: true,
-      subscription: null,
-      usage: {
-        ai_messages: 0,
-        ai_tokens: 0,
-        conversations: 0,
-        agents: 0,
-        knowledge_storage: 0,
-        documents: 0,
-        team_members: 0,
-        bookings: 0,
-      },
-      limits: PLAN_LIMITS.starter,
+      subscription,
+      usage,
+      limits: PLAN_LIMITS[plan],
     };
   } catch (error) {
     console.error("Failed to fetch billing status:", error);
@@ -63,16 +59,22 @@ export async function getBillingStatus(workspaceId: string) {
   }
 }
 
-export async function cancelSubscription(workspaceId: string, reason?: string) {
-  await requireAuth();
+export async function cancelSubscription(workspaceId: string, _reason?: string) {
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.SETTINGS_UPDATE);
 
   try {
-    // TODO: Fetch subscription from Directus
-    // const subscription = await subscriptionRepo.getByWorkspace(workspaceId);
-    // if (!subscription) return { error: "No active subscription found." };
-    // const provider = getProvider(subscription.paymentProvider);
-    // await provider.cancelSubscription(subscription.paymentProviderSubscriptionId);
-    // await subscriptionRepo.updateStatus(subscription.id, "canceled");
+    const subscription = await subscriptionRepo.getSubscriptionByWorkspace(workspaceId);
+    if (!subscription?.paymentProviderSubscriptionId) {
+      return { error: "No active subscription found." };
+    }
+
+    const provider = getProvider(subscription.paymentProvider as "stripe" | "paypal" | "lemon_squeezy");
+    await provider.cancelSubscription(subscription.paymentProviderSubscriptionId);
+
+    await subscriptionRepo.updateSubscription(workspaceId, {
+      status: "canceled",
+      cancelAtPeriodEnd: true,
+    });
 
     revalidatePath("/dashboard/settings/billing");
     return { success: true };
@@ -83,15 +85,10 @@ export async function cancelSubscription(workspaceId: string, reason?: string) {
 }
 
 export async function changePlan(workspaceId: string, newPlan: PlanName) {
-  await requireAuth();
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.SETTINGS_UPDATE);
 
   try {
-    // TODO: Update subscription in Directus
-    // const subscription = await subscriptionRepo.getByWorkspace(workspaceId);
-    // if (!subscription) return { error: "No active subscription found." };
-    // const provider = getProvider(subscription.paymentProvider);
-    // await provider.updateSubscriptionPlan(subscription.paymentProviderSubscriptionId, newPlan);
-    // await subscriptionRepo.updatePlan(subscription.id, newPlan);
+    await subscriptionRepo.updateSubscription(workspaceId, { plan: newPlan });
 
     revalidatePath("/dashboard/settings/billing");
     return { success: true };
@@ -102,10 +99,12 @@ export async function changePlan(workspaceId: string, newPlan: PlanName) {
 }
 
 export async function createCustomerPortalSession(workspaceId: string) {
-  await requireAuth();
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.SETTINGS_UPDATE);
 
   try {
-    const provider = getProvider("stripe");
+    const subscription = await subscriptionRepo.getSubscriptionByWorkspace(workspaceId);
+    const providerName = subscription?.paymentProvider ?? "stripe";
+    const provider = getProvider(providerName as "stripe" | "paypal" | "lemon_squeezy");
     const url = await provider.createCustomerPortalSession(workspaceId);
     return { success: true, url };
   } catch (error) {
@@ -115,24 +114,21 @@ export async function createCustomerPortalSession(workspaceId: string) {
 }
 
 export async function checkUsageLimit(workspaceId: string, metric: keyof typeof PLAN_LIMITS.starter) {
-  await requireAuth();
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.SETTINGS_UPDATE);
 
   try {
-    // TODO: Fetch current usage from Directus
-    // const usage = await usageRepo.getCurrentUsage(workspaceId, metric);
-    // const subscription = await subscriptionRepo.getByWorkspace(workspaceId);
-    // const plan = subscription?.plan ?? "starter";
-    // const limit = PLAN_LIMITS[plan][metric];
-
-    const usage = 0;
-    const limit = PLAN_LIMITS.starter[metric];
+    const usage = await getWorkspaceUsage(workspaceId);
+    const subscription = await subscriptionRepo.getSubscriptionByWorkspace(workspaceId);
+    const plan = subscription?.plan ?? "starter";
+    const limit = PLAN_LIMITS[plan][metric];
+    const current = usage[metric] ?? 0;
 
     return {
       success: true,
-      allowed: usage < limit,
-      usage,
+      allowed: current < limit,
+      usage: current,
       limit,
-      remaining: Math.max(0, limit - usage),
+      remaining: Math.max(0, limit - current),
     };
   } catch (error) {
     console.error("Usage check error:", error);
@@ -140,17 +136,14 @@ export async function checkUsageLimit(workspaceId: string, metric: keyof typeof 
   }
 }
 
-export async function recordUsage(workspaceId: string, metric: string, amount: number) {
-  await requireAuth();
+export async function recordUsage(workspaceId: string, _metric: string, _amount: number) {
+  await requireWorkspaceAccess(workspaceId, PERMISSIONS.SETTINGS_UPDATE);
 
   try {
-    // TODO: Store in Directus
-    // await usageRepo.record(workspaceId, metric, amount);
+    // Usage is computed on-demand from Directus collections; no separate counter.
     return { success: true };
   } catch (error) {
     console.error("Record usage error:", error);
     return { error: "Failed to record usage." };
   }
 }
-
-export { PLAN_LIMITS };

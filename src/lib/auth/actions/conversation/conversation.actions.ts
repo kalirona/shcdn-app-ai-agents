@@ -7,6 +7,7 @@ import type { z } from "zod";
 import { requireWorkspaceAccess } from "@/lib/auth/access";
 import { PERMISSIONS } from "@/lib/auth/roles";
 import { sendMessageSchema, updateConversationStatusSchema } from "@/lib/auth/schemas/conversation.schema";
+import { enforceMessageLimit } from "@/lib/billing/usage-enforcement";
 import * as conversationRepo from "@/lib/db/repositories/conversation.repo";
 
 export async function getWorkspaceConversations(workspaceId: string) {
@@ -54,6 +55,11 @@ export async function sendMessage(data: z.infer<typeof sendMessageSchema>) {
       return { error: "Conversation not found." };
     }
     await requireWorkspaceAccess(conversation.workspace, PERMISSIONS.CONVERSATIONS_READ);
+
+    const limitCheck = await enforceMessageLimit(conversation.workspace);
+    if (!limitCheck.allowed) {
+      return { error: limitCheck.error ?? "Message limit reached." };
+    }
 
     const message = await conversationRepo.createMessage({
       conversation: parsed.data.conversationId,

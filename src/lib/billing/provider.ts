@@ -1,6 +1,6 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-
 import type { PlanName } from "@/lib/auth/schemas/billing.schema";
+
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 export type PaymentProvider = "stripe" | "paypal" | "lemon_squeezy";
 
@@ -56,35 +56,27 @@ export interface SubscriptionResult {
 }
 
 export interface PaymentProviderAdapter {
-  createCheckoutSession(
-    plan: PlanName,
-    workspaceId: string,
-    customerEmail: string,
-  ): Promise<CheckoutSession>;
+  createCheckoutSession(plan: PlanName, workspaceId: string, customerEmail: string): Promise<CheckoutSession>;
 
-  createCustomerPortalSession(
-    workspaceId: string,
-  ): Promise<string>;
+  createCustomerPortalSession(workspaceId: string): Promise<string>;
 
-  cancelSubscription(
-    subscriptionId: string,
-    immediately?: boolean,
-  ): Promise<void>;
+  cancelSubscription(subscriptionId: string, immediately?: boolean): Promise<void>;
 
   getSubscription(subscriptionId: string): Promise<Partial<Subscription>>;
 
-  verifyWebhookSignature(
-    payload: string,
-    signature: string,
-  ): boolean;
+  verifyWebhookSignature(payload: string, signature: string): boolean;
 
-  parseWebhookEvent(
-    payload: Record<string, unknown>,
-  ): WebhookEvent | null;
+  parseWebhookEvent(payload: Record<string, unknown>): WebhookEvent | null;
 }
 
 export interface WebhookEvent {
-  type: "subscription.created" | "subscription.updated" | "subscription.canceled" | "subscription.past_due" | "invoice.paid" | "invoice.payment_failed";
+  type:
+    | "subscription.created"
+    | "subscription.updated"
+    | "subscription.canceled"
+    | "subscription.past_due"
+    | "invoice.paid"
+    | "invoice.payment_failed";
   workspaceId: string;
   subscriptionId?: string;
   plan?: PlanName;
@@ -113,12 +105,12 @@ function createStripeProvider(): PaymentProviderAdapter {
           Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
         },
         body: new URLSearchParams({
-          "customer_email": customerEmail,
+          customer_email: customerEmail,
           "line_items[0][price]": getStripePriceId(plan),
           "line_items[0][quantity]": "1",
-          "mode": "subscription",
-          "success_url": `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/billing?success=true`,
-          "cancel_url": `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/billing`,
+          mode: "subscription",
+          success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/billing?success=true`,
+          cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/billing`,
           "metadata[workspace_id]": workspaceId,
           "subscription_data[metadata][workspace_id]": workspaceId,
         }).toString(),
@@ -163,9 +155,7 @@ function createStripeProvider(): PaymentProviderAdapter {
         ? `https://api.stripe.com/v1/subscriptions/${subscriptionId}`
         : `https://api.stripe.com/v1/subscriptions/${subscriptionId}`;
 
-      const body = immediately
-        ? null
-        : new URLSearchParams({ "cancel_at_period_end": "true" }).toString();
+      const body = immediately ? null : new URLSearchParams({ cancel_at_period_end: "true" }).toString();
 
       const response = await fetch(url, {
         method: immediately ? "DELETE" : "POST",
@@ -183,12 +173,9 @@ function createStripeProvider(): PaymentProviderAdapter {
     },
 
     async getSubscription(subscriptionId) {
-      const response = await fetch(
-        `https://api.stripe.com/v1/subscriptions/${subscriptionId}`,
-        {
-          headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
-        },
-      );
+      const response = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+        headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
+      });
 
       if (!response.ok) {
         const error = await response.text();
@@ -240,11 +227,11 @@ function createStripeProvider(): PaymentProviderAdapter {
       const mappedType = eventMap[eventType];
       if (!mappedType) return null;
 
-      const data = (payload.data as Record<string, unknown>)?.object as Record<string, unknown> ?? {};
+      const data = ((payload.data as Record<string, unknown>)?.object as Record<string, unknown>) ?? {};
 
       return {
         type: mappedType,
-        workspaceId: (data.metadata as Record<string, unknown>)?.workspace_id as string ?? "",
+        workspaceId: ((data.metadata as Record<string, unknown>)?.workspace_id as string) ?? "",
         subscriptionId: data.id as string,
         plan: (data.metadata as Record<string, unknown>)?.plan as PlanName | undefined,
         amount: data.amount_due ? (data.amount_due as number) / 100 : undefined,
@@ -255,32 +242,37 @@ function createStripeProvider(): PaymentProviderAdapter {
 }
 
 function createPayPalProvider(): PaymentProviderAdapter {
+  const payPalAuthHeader = () =>
+    `Basic ${Buffer.from(`${process.env.PAYPAL_CLIENT_ID ?? ""}:${process.env.PAYPAL_CLIENT_SECRET ?? ""}`).toString(
+      "base64",
+    )}`;
+
+  const payPalBaseUrl = () =>
+    process.env.PAYPAL_MODE === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+
+  async function getPayPalAccessToken(): Promise<string> {
+    const response = await fetch(`${payPalBaseUrl()}/v1/oauth2/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: payPalAuthHeader(),
+      },
+      body: "grant_type=client_credentials",
+    });
+
+    if (!response.ok) {
+      throw new Error("PayPal authentication failed");
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  }
+
   return {
     async createCheckoutSession(plan, workspaceId, customerEmail) {
-      // PayPal uses a different flow: create order, capture payment
-      const baseUrl = process.env.PAYPAL_MODE === "live"
-        ? "https://api-m.paypal.com"
-        : "https://api-m.sandbox.paypal.com";
+      const accessToken = await getPayPalAccessToken();
 
-      // Get access token
-      const tokenResponse = await fetch(`${baseUrl}/v1/oauth2/token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Buffer.from("${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}").toString("base64")`,
-        },
-        body: "grant_type=client_credentials",
-      });
-
-      if (!tokenResponse.ok) {
-        throw new Error("PayPal authentication failed");
-      }
-
-      const tokenData = await tokenResponse.json();
-      const accessToken = tokenData.access_token;
-
-      // Create order
-      const orderResponse = await fetch(`${baseUrl}/v2/checkout/orders`, {
+      const orderResponse = await fetch(`${payPalBaseUrl()}/v2/checkout/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -288,13 +280,15 @@ function createPayPalProvider(): PaymentProviderAdapter {
         },
         body: JSON.stringify({
           intent: "CAPTURE",
-          purchase_units: [{
-            amount: {
-              currency_code: "USD",
-              value: getPayPalPrice(plan),
+          purchase_units: [
+            {
+              amount: {
+                currency_code: "USD",
+                value: getPayPalPrice(plan),
+              },
+              custom_id: workspaceId,
             },
-            custom_id: workspaceId,
-          }],
+          ],
           payment_source: {
             paypal: {
               email_address: customerEmail,
@@ -325,51 +319,29 @@ function createPayPalProvider(): PaymentProviderAdapter {
     },
 
     async cancelSubscription(subscriptionId) {
-      const baseUrl = process.env.PAYPAL_MODE === "live"
-        ? "https://api-m.paypal.com"
-        : "https://api-m.sandbox.paypal.com";
+      const accessToken = await getPayPalAccessToken();
 
-      const tokenResponse = await fetch(`${baseUrl}/v1/oauth2/token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Buffer.from("${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}").toString("base64")`,
-        },
-        body: "grant_type=client_credentials",
-      });
-
-      const tokenData = await tokenResponse.json();
-
-      await fetch(`${baseUrl}/v1/billing/subscriptions/${subscriptionId}/cancel`, {
+      const response = await fetch(`${payPalBaseUrl()}/v1/billing/subscriptions/${subscriptionId}/cancel`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${tokenData.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ reason: "Customer requested cancellation" }),
       });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`PayPal cancel error: ${error}`);
+      }
     },
 
     async getSubscription(subscriptionId) {
-      const baseUrl = process.env.PAYPAL_MODE === "live"
-        ? "https://api-m.paypal.com"
-        : "https://api-m.sandbox.paypal.com";
+      const accessToken = await getPayPalAccessToken();
 
-      const tokenResponse = await fetch(`${baseUrl}/v1/oauth2/token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Buffer.from("${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}").toString("base64")`,
-        },
-        body: "grant_type=client_credentials",
+      const response = await fetch(`${payPalBaseUrl()}/v1/billing/subscriptions/${subscriptionId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
-
-      const tokenData = await tokenResponse.json();
-
-      const response = await fetch(
-        `${baseUrl}/v1/billing/subscriptions/${subscriptionId}`,
-        { headers: { Authorization: `Bearer ${tokenData.access_token}` } },
-      );
 
       if (!response.ok) throw new Error("Failed to get PayPal subscription");
 
@@ -409,11 +381,11 @@ function createPayPalProvider(): PaymentProviderAdapter {
       const mappedType = eventMap[eventType];
       if (!mappedType) return null;
 
-      const resource = payload.resource as Record<string, unknown> ?? {};
+      const resource = (payload.resource as Record<string, unknown>) ?? {};
 
       return {
         type: mappedType,
-        workspaceId: resource.custom_id as string ?? "",
+        workspaceId: (resource.custom_id as string) ?? "",
         subscriptionId: resource.id as string,
         plan: resource.plan_id as PlanName | undefined,
         amount: (resource.amount as Record<string, unknown>)?.total as number,
@@ -498,26 +470,23 @@ function createLemonSqueezyProvider(): PaymentProviderAdapter {
     },
 
     async cancelSubscription(subscriptionId) {
-      const response = await fetch(
-        `https://api.lemonsqueezy.com/v1/subscriptions/${subscriptionId}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.LEMON_SQUEEZY_API_KEY}`,
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            data: {
-              type: "subscriptions",
-              id: subscriptionId,
-              attributes: {
-                cancelled: true,
-              },
-            },
-          }),
+      const response = await fetch(`https://api.lemonsqueezy.com/v1/subscriptions/${subscriptionId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.LEMON_SQUEEZY_API_KEY}`,
+          Accept: "application/json",
         },
-      );
+        body: JSON.stringify({
+          data: {
+            type: "subscriptions",
+            id: subscriptionId,
+            attributes: {
+              cancelled: true,
+            },
+          },
+        }),
+      });
 
       if (!response.ok) {
         const error = await response.text();
@@ -526,15 +495,12 @@ function createLemonSqueezyProvider(): PaymentProviderAdapter {
     },
 
     async getSubscription(subscriptionId) {
-      const response = await fetch(
-        `https://api.lemonsqueezy.com/v1/subscriptions/${subscriptionId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.LEMON_SQUEEZY_API_KEY}`,
-            Accept: "application/json",
-          },
+      const response = await fetch(`https://api.lemonsqueezy.com/v1/subscriptions/${subscriptionId}`, {
+        headers: {
+          Authorization: `Bearer ${process.env.LEMON_SQUEEZY_API_KEY}`,
+          Accept: "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         const error = await response.text();
@@ -569,28 +535,28 @@ function createLemonSqueezyProvider(): PaymentProviderAdapter {
     },
 
     parseWebhookEvent(payload: Record<string, unknown>) {
-      const meta = payload.meta as Record<string, unknown> ?? {};
+      const meta = (payload.meta as Record<string, unknown>) ?? {};
       const eventName = meta.event_name as string;
 
       const eventMap: Record<string, WebhookEvent["type"]> = {
-        "subscription_created": "subscription.created",
-        "subscription_updated": "subscription.updated",
-        "subscription_cancelled": "subscription.canceled",
-        "subscription_resumed": "subscription.updated",
-        "subscription_expired": "subscription.canceled",
-        "order_created": "invoice.paid",
-        "order_refunded": "invoice.payment_failed",
+        subscription_created: "subscription.created",
+        subscription_updated: "subscription.updated",
+        subscription_cancelled: "subscription.canceled",
+        subscription_resumed: "subscription.updated",
+        subscription_expired: "subscription.canceled",
+        order_created: "invoice.paid",
+        order_refunded: "invoice.payment_failed",
       };
 
       const mappedType = eventMap[eventName];
       if (!mappedType) return null;
 
-      const data = payload.data as Record<string, unknown> ?? {};
-      const customData = meta.custom_data as Record<string, unknown> ?? {};
+      const data = (payload.data as Record<string, unknown>) ?? {};
+      const customData = (meta.custom_data as Record<string, unknown>) ?? {};
 
       return {
         type: mappedType,
-        workspaceId: customData.workspace_id as string ?? "",
+        workspaceId: (customData.workspace_id as string) ?? "",
         subscriptionId: data.id as string,
         plan: customData.plan as PlanName | undefined,
       };
@@ -609,7 +575,11 @@ function getPayPalPrice(plan: PlanName): string {
 }
 
 function getLemonSqueezyVariantId(plan: PlanName): string {
-  const ids = { starter: process.env.LS_STARTER_VARIANT ?? "", business: process.env.LS_BUSINESS_VARIANT ?? "", pro: process.env.LS_PRO_VARIANT ?? "" };
+  const ids = {
+    starter: process.env.LS_STARTER_VARIANT ?? "",
+    business: process.env.LS_BUSINESS_VARIANT ?? "",
+    pro: process.env.LS_PRO_VARIANT ?? "",
+  };
   return ids[plan];
 }
 

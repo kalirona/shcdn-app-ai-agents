@@ -109,6 +109,18 @@ await field("workspaces", { field: "website", type: "string", schema: { is_nulla
 await field("workspaces", { field: "status", type: "string", schema: { is_nullable: false, default_value: "active" }, meta: sel([
   { text: "Active", value: "active" }, { text: "Suspended", value: "suspended" }, { text: "Archived", value: "archived" },
 ]) });
+await field("workspaces", { field: "plan", type: "string", schema: { is_nullable: false, default_value: "starter" }, meta: sel([
+  { text: "Starter", value: "starter" }, { text: "Business", value: "business" }, { text: "Pro", value: "pro" },
+]) });
+await field("workspaces", { field: "subscription_status", type: "string", schema: { is_nullable: false, default_value: "free" }, meta: sel([
+  { text: "Free", value: "free" }, { text: "Trialing", value: "trialing" }, { text: "Active", value: "active" }, { text: "Past Due", value: "past_due" }, { text: "Canceled", value: "canceled" },
+]) });
+await field("workspaces", { field: "payment_provider", type: "string", schema: { is_nullable: true, max_length: 32 }, meta: { interface: "input" } });
+await field("workspaces", { field: "payment_provider_subscription_id", type: "string", schema: { is_nullable: true, max_length: 256 }, meta: { interface: "input" } });
+await field("workspaces", { field: "payment_provider_customer_id", type: "string", schema: { is_nullable: true, max_length: 256 }, meta: { interface: "input" } });
+await field("workspaces", { field: "current_period_start", type: "timestamp", schema: { is_nullable: true }, meta: { interface: "datetime" } });
+await field("workspaces", { field: "current_period_end", type: "timestamp", schema: { is_nullable: true }, meta: { interface: "datetime" } });
+await field("workspaces", { field: "cancel_at_period_end", type: "boolean", schema: { is_nullable: false, default_value: false }, meta: { interface: "boolean" } });
 await timestamps("workspaces");
 
 // 2. memberships

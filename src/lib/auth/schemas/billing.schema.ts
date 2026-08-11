@@ -96,3 +96,5 @@ export const PLAN_PRICES = {
 } as const;
 
 export type PlanName = keyof typeof PLAN_LIMITS;
+
+export type UsageMetric = keyof typeof PLAN_LIMITS.starter;
