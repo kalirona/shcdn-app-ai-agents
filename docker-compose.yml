@@ -11,7 +11,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
-      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:9000}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - LOGTO_ENDPOINT=${LOGTO_ENDPOINT}
       - LOGTO_APP_ID=${LOGTO_APP_ID}
       - LOGTO_APP_SECRET=${LOGTO_APP_SECRET}
