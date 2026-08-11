@@ -2,13 +2,22 @@ import { type NextRequest, NextResponse } from "next/server";
 
 const isLocalDev = process.env.NODE_ENV === "development" && !process.env.LOGTO_ENDPOINT;
 
-const PUBLIC_PATHS = ["/", "/auth", "/callback", "/unauthorized", "/widget", "/a"];
+const PUBLIC_PATHS = ["/", "/auth", "/callback", "/unauthorized", "/widget", "/a", "/api"];
 const AUTH_PATHS = ["/auth/v1/login", "/auth/v1/register", "/callback"];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some((p) => {
+    if (p === "/") {
+      return pathname === "/";
+    }
+    return pathname.startsWith(p);
+  });
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  const isPublic = isPublicPath(pathname);
   const isAuthPath = AUTH_PATHS.some((p) => pathname.startsWith(p));
 
   if (isLocalDev) {
@@ -32,11 +41,11 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
-    if (!context.isAuthenticated && !isPublic && pathname.startsWith("/dashboard")) {
+    if (!context.isAuthenticated && !isPublic) {
       return NextResponse.redirect(new URL("/auth/v1/login", request.url));
     }
   } catch {
-    if (!isPublic && pathname.startsWith("/dashboard")) {
+    if (!isPublic) {
       return NextResponse.redirect(new URL("/auth/v1/login", request.url));
     }
   }

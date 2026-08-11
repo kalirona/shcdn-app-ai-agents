@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+
 import { CircleUser, CreditCard, LogOut, MessageSquareDot } from "lucide-react";
-import { useSidebar } from "@/components/ui/sidebar";
-import { getInitials } from "@/lib/utils";
+
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,8 +14,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
+import { signOutAction } from "@/lib/auth/auth-actions";
+import { getInitials } from "@/lib/utils";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -77,10 +79,12 @@ export function NavUser() {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/auth/v1/login">
-                <LogOut />
-                Log out
-              </Link>
+              <form action={signOutAction} className="w-full">
+                <button type="submit" className="flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-sm">
+                  <LogOut />
+                  <span>Log out</span>
+                </button>
+              </form>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

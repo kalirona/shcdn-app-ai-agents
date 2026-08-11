@@ -8,6 +8,8 @@ import { Bot, MessageSquare, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getWorkspaceAgents } from "@/lib/auth/actions/agent.actions";
+import { getUserWorkspaces } from "@/lib/auth/actions/workspace.actions";
 import type { AgentEntity } from "@/lib/db/entities";
 import { getAgentsFromStorage } from "@/lib/db/storage-helper";
 
@@ -35,13 +37,10 @@ function AgentCard({ agent }: { agent: AgentEntity }) {
                 <h3 className="truncate font-medium">{agent.name}</h3>
                 <StatusLabel status={agent.status} />
               </div>
-              {agent.description && (
-                <p className="mt-1 truncate text-muted-foreground text-sm">{agent.description}</p>
-              )}
+              {agent.description && <p className="mt-1 truncate text-muted-foreground text-sm">{agent.description}</p>}
               <div className="mt-2 flex items-center gap-3 text-muted-foreground text-xs">
                 <span className="flex items-center gap-1">
-                  <MessageSquare className="size-3" />
-                  0 conversations
+                  <MessageSquare className="size-3" />0 conversations
                 </span>
                 <span>{agent.tone}</span>
               </div>
@@ -104,8 +103,28 @@ export default function AgentsPage() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    setAgents(getAgentsFromStorage());
-    setIsLoaded(true);
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const wsResult = await getUserWorkspaces();
+        if (wsResult.success && wsResult.workspaces.length > 0) {
+          const result = await getWorkspaceAgents(wsResult.workspaces[0].id);
+          if (result.success && result.agents) {
+            if (!cancelled) setAgents(result.agents as AgentEntity[]);
+            if (!cancelled) setIsLoaded(true);
+            return;
+          }
+        }
+      } catch {
+        // fall through to local storage
+      }
+      if (!cancelled) setAgents(getAgentsFromStorage());
+      if (!cancelled) setIsLoaded(true);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

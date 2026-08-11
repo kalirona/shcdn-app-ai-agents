@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
+
 import { ArrowLeft, ArrowRight, Bot, Loader2, MessageSquare, Pause, Play, Shield, Target, Users } from "lucide-react";
 import { toast } from "sonner";
 
@@ -11,17 +12,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { AgentEntity } from "@/lib/db/entities";
+import { createAgent } from "@/lib/auth/actions/agent.actions";
+import { getUserWorkspaces } from "@/lib/auth/actions/workspace.actions";
 import {
-  AGENT_BEHAVIORS,
-  AGENT_BEHAVIOR_LABELS,
   AGENT_BEHAVIOR_DESCRIPTIONS,
-  TOOLS,
-  TOOL_LABELS,
-  TOOL_CATEGORIES,
+  AGENT_BEHAVIOR_LABELS,
+  AGENT_BEHAVIORS,
   getToolsForBehaviors,
+  TOOL_CATEGORIES,
+  TOOL_LABELS,
+  TOOLS,
 } from "@/lib/auth/agent-config";
+import type { AgentEntity } from "@/lib/db/entities";
 import { saveAgentToStorage } from "@/lib/db/storage-helper";
+
+async function getFirstWorkspaceId(): Promise<string> {
+  try {
+    const result = await getUserWorkspaces();
+    if (result.success && result.workspaces.length > 0) {
+      return result.workspaces[0].id;
+    }
+  } catch {
+    // ignore
+  }
+  return "workspace-1";
+}
 
 const AGENT_PURPOSES = [
   {
@@ -103,6 +118,7 @@ const AGENT_GOALS = [
 
 export default function CreateAgentWizard() {
   const router = useRouter();
+  const agentIdRef = useRef(`${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -141,7 +157,7 @@ export default function CreateAgentWizard() {
     const goalLabel = AGENT_GOALS.find((g) => g.id === primaryGoal)?.label ?? "help customers";
     const secondaryGoalLabel = AGENT_GOALS.find((g) => g.id === secondaryGoal)?.label ?? "";
 
-    let prompt = `You are ${name}, an AI ${purposeLabel} for this business.
+    const prompt = `You are ${name}, an AI ${purposeLabel} for this business.
 
 ## Your Identity
 - Name: ${name}
@@ -176,7 +192,7 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
     return prompt;
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!name.trim() || !greeting.trim() || !fallbackMessage.trim()) {
       setError("Please fill in all required fields.");
       return;
@@ -186,9 +202,38 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
     setIsLoading(true);
 
     try {
-      const agent: AgentEntity = {
-        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        workspace: "workspace-1",
+      const workspaceId = await getFirstWorkspaceId();
+
+      const result = await createAgent(workspaceId, {
+        name: name.trim(),
+        description: AGENT_PURPOSES.find((p) => p.id === purpose)?.label ?? "",
+        tone: tone as "professional" | "friendly" | "casual" | "custom",
+        greeting: greeting.trim(),
+        fallbackMessage: fallbackMessage.trim(),
+        language: "en",
+        systemInstructions: instructions.trim() || getSystemPrompt(),
+        purpose,
+        primaryGoal,
+        secondaryGoal,
+        fallbackAction,
+        behaviors,
+        allowedTools: getToolsForBehaviors(behaviors as any),
+      });
+
+      if (result.agent) {
+        saveAgentToStorage(result.agent as AgentEntity);
+        toast.success("Agent created successfully!");
+        router.push(`/dashboard/agents/${result.agent.id}/overview`);
+        return;
+      }
+
+      if (result.error) {
+        console.error("Failed to create agent in DB:", result.error);
+      }
+
+      const fallbackAgent: AgentEntity = {
+        id: agentIdRef.current,
+        workspace: workspaceId,
         name: name.trim(),
         description: AGENT_PURPOSES.find((p) => p.id === purpose)?.label || null,
         avatar: null,
@@ -208,10 +253,9 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
         allowed_tools: getToolsForBehaviors(behaviors as any),
       };
 
-      saveAgentToStorage(agent);
-
+      saveAgentToStorage(fallbackAgent);
       toast.success("Agent created successfully!");
-      router.push(`/dashboard/agents/${agent.id}/overview`);
+      router.push(`/dashboard/agents/${agentIdRef.current}/overview`);
     } catch {
       setError("Failed to create agent. Please try again.");
       setIsLoading(false);
@@ -227,7 +271,14 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
         </Button>
         <h1 className="font-semibold text-2xl tracking-tight">Create AI Agent</h1>
         <p className="text-muted-foreground">
-          Step {step} of 4 — {step === 1 ? "What should it do?" : step === 2 ? "Goals & behavior" : step === 3 ? "Capabilities & tools" : "Review & publish"}
+          Step {step} of 4 —{" "}
+          {step === 1
+            ? "What should it do?"
+            : step === 2
+              ? "Goals & behavior"
+              : step === 3
+                ? "Capabilities & tools"
+                : "Review & publish"}
         </p>
       </div>
 
@@ -270,9 +321,7 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
                       type="button"
                       onClick={() => handlePurposeChange(p.id)}
                       className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all ${
-                        purpose === p.id
-                          ? "border-primary bg-primary/5 shadow-sm"
-                          : "hover:border-muted-foreground/50"
+                        purpose === p.id ? "border-primary bg-primary/5 shadow-sm" : "hover:border-muted-foreground/50"
                       }`}
                     >
                       <Icon className={`size-6 ${purpose === p.id ? "text-primary" : "text-muted-foreground"}`} />
@@ -313,12 +362,12 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
                     type="button"
                     onClick={() => setPrimaryGoal(goal.id)}
                     className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
-                      primaryGoal === goal.id
-                        ? "border-primary bg-primary/5"
-                        : "hover:border-muted-foreground/50"
+                      primaryGoal === goal.id ? "border-primary bg-primary/5" : "hover:border-muted-foreground/50"
                     }`}
                   >
-                    <Target className={`size-4 shrink-0 ${primaryGoal === goal.id ? "text-primary" : "text-muted-foreground"}`} />
+                    <Target
+                      className={`size-4 shrink-0 ${primaryGoal === goal.id ? "text-primary" : "text-muted-foreground"}`}
+                    />
                     <div>
                       <p className="font-medium text-sm">{goal.label}</p>
                       <p className="text-muted-foreground text-xs">{goal.description}</p>
@@ -336,12 +385,12 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
                     type="button"
                     onClick={() => setSecondaryGoal(goal.id)}
                     className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
-                      secondaryGoal === goal.id
-                        ? "border-primary bg-primary/5"
-                        : "hover:border-muted-foreground/50"
+                      secondaryGoal === goal.id ? "border-primary bg-primary/5" : "hover:border-muted-foreground/50"
                     }`}
                   >
-                    <Play className={`size-4 shrink-0 ${secondaryGoal === goal.id ? "text-primary" : "text-muted-foreground"}`} />
+                    <Play
+                      className={`size-4 shrink-0 ${secondaryGoal === goal.id ? "text-primary" : "text-muted-foreground"}`}
+                    />
                     <div>
                       <p className="font-medium text-sm">{goal.label}</p>
                       <p className="text-muted-foreground text-xs">{goal.description}</p>
@@ -363,12 +412,12 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
                     type="button"
                     onClick={() => setFallbackAction(opt.id)}
                     className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
-                      fallbackAction === opt.id
-                        ? "border-primary bg-primary/5"
-                        : "hover:border-muted-foreground/50"
+                      fallbackAction === opt.id ? "border-primary bg-primary/5" : "hover:border-muted-foreground/50"
                     }`}
                   >
-                    <Pause className={`size-4 shrink-0 ${fallbackAction === opt.id ? "text-primary" : "text-muted-foreground"}`} />
+                    <Pause
+                      className={`size-4 shrink-0 ${fallbackAction === opt.id ? "text-primary" : "text-muted-foreground"}`}
+                    />
                     <div>
                       <p className="font-medium text-sm">{opt.label}</p>
                       <p className="text-muted-foreground text-xs">{opt.desc}</p>
@@ -430,7 +479,9 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
         <Card>
           <CardHeader>
             <CardTitle>Capabilities & tools</CardTitle>
-            <CardDescription>Choose what your AI agent can do. This controls which tools it can access.</CardDescription>
+            <CardDescription>
+              Choose what your AI agent can do. This controls which tools it can access.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
@@ -450,17 +501,21 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
                         }
                       }}
                       className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
-                        isEnabled
-                          ? "border-primary bg-primary/5"
-                          : "hover:border-muted-foreground/50"
+                        isEnabled ? "border-primary bg-primary/5" : "hover:border-muted-foreground/50"
                       }`}
                     >
-                      <div className={`flex size-5 shrink-0 items-center justify-center rounded border ${isEnabled ? "border-primary bg-primary" : "border-muted-foreground"}`}>
+                      <div
+                        className={`flex size-5 shrink-0 items-center justify-center rounded border ${isEnabled ? "border-primary bg-primary" : "border-muted-foreground"}`}
+                      >
                         {isEnabled && <span className="text-white text-xs">✓</span>}
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{AGENT_BEHAVIOR_LABELS[behavior as keyof typeof AGENT_BEHAVIOR_LABELS]}</p>
-                        <p className="text-muted-foreground text-xs">{AGENT_BEHAVIOR_DESCRIPTIONS[behavior as keyof typeof AGENT_BEHAVIOR_DESCRIPTIONS]}</p>
+                        <p className="font-medium text-sm">
+                          {AGENT_BEHAVIOR_LABELS[behavior as keyof typeof AGENT_BEHAVIOR_LABELS]}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {AGENT_BEHAVIOR_DESCRIPTIONS[behavior as keyof typeof AGENT_BEHAVIOR_DESCRIPTIONS]}
+                        </p>
                       </div>
                     </button>
                   );
@@ -510,10 +565,24 @@ ${instructions ? `## Custom Instructions\n${instructions}` : ""}`;
                 </span>
               </div>
               <div className="grid gap-2 text-sm">
-                <p><strong>Primary Goal:</strong> {AGENT_GOALS.find((g) => g.id === primaryGoal)?.label}</p>
-                <p><strong>Fallback:</strong> {fallbackAction === "transfer_human" ? "Transfer to human" : fallbackAction === "create_ticket" ? "Create ticket" : "Collect info"}</p>
-                <p><strong>Greeting:</strong> {greeting}</p>
-                <p><strong>Capabilities:</strong> {behaviors.map((b) => AGENT_BEHAVIOR_LABELS[b as keyof typeof AGENT_BEHAVIOR_LABELS]).join(", ")}</p>
+                <p>
+                  <strong>Primary Goal:</strong> {AGENT_GOALS.find((g) => g.id === primaryGoal)?.label}
+                </p>
+                <p>
+                  <strong>Fallback:</strong>{" "}
+                  {fallbackAction === "transfer_human"
+                    ? "Transfer to human"
+                    : fallbackAction === "create_ticket"
+                      ? "Create ticket"
+                      : "Collect info"}
+                </p>
+                <p>
+                  <strong>Greeting:</strong> {greeting}
+                </p>
+                <p>
+                  <strong>Capabilities:</strong>{" "}
+                  {behaviors.map((b) => AGENT_BEHAVIOR_LABELS[b as keyof typeof AGENT_BEHAVIOR_LABELS]).join(", ")}
+                </p>
               </div>
             </div>
             <div className="flex justify-between">

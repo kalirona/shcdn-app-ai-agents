@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { useParams, useRouter } from "next/navigation";
+
 import { AlertTriangle, Check, Pause, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,15 +18,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getAgentById, updateAgent } from "@/lib/auth/actions/agent.actions";
 import type { AgentEntity } from "@/lib/db/entities";
 import { deleteAgentFromStorage, getAgentFromStorage, saveAgentToStorage } from "@/lib/db/storage-helper";
+
 import { PublicAgentCard } from "./_components/public-agent-card";
 
 export default function SettingsPage() {
@@ -38,13 +36,31 @@ export default function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    const found = getAgentFromStorage(agentId);
-    if (found) {
-      setAgent(found);
-    } else {
-      router.push("/dashboard/agents");
-    }
-    setIsLoading(false);
+    let cancelled = false;
+    const load = async () => {
+      const local = getAgentFromStorage(agentId);
+      try {
+        const result = await getAgentById(agentId);
+        if (result.success && result.agent) {
+          saveAgentToStorage(result.agent as AgentEntity);
+          if (!cancelled) setAgent(result.agent as AgentEntity);
+          if (!cancelled) setIsLoading(false);
+          return;
+        }
+      } catch {
+        // fall through
+      }
+      if (local) {
+        if (!cancelled) setAgent(local);
+      } else {
+        router.push("/dashboard/agents");
+      }
+      if (!cancelled) setIsLoading(false);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [agentId, router]);
 
   async function handleStatusChange(newStatus: AgentEntity["status"]) {
@@ -52,7 +68,14 @@ export default function SettingsPage() {
     const updated = { ...agent, status: newStatus, date_updated: new Date().toISOString() };
     saveAgentToStorage(updated);
     setAgent(updated);
-    toast.success(`Agent ${newStatus === "active" ? "activated" : newStatus === "paused" ? "paused" : "saved as draft"}.`);
+    const result = await updateAgent(agentId, { status: newStatus });
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success(
+        `Agent ${newStatus === "active" ? "activated" : newStatus === "paused" ? "paused" : "saved as draft"}.`,
+      );
+    }
   }
 
   async function handleDelete() {
@@ -117,7 +140,9 @@ export default function SettingsPage() {
             </Button>
           </div>
           <div className="flex items-center gap-2 rounded-md bg-muted p-3">
-            <span className={`size-2 rounded-full ${agent.status === "active" ? "bg-green-500" : agent.status === "paused" ? "bg-yellow-500" : "bg-muted-foreground"}`} />
+            <span
+              className={`size-2 rounded-full ${agent.status === "active" ? "bg-green-500" : agent.status === "paused" ? "bg-yellow-500" : "bg-muted-foreground"}`}
+            />
             <span className="text-sm">
               Currently <span className="font-medium capitalize">{agent.status}</span>
               {agent.status === "active" && " — Agent is live and responding to customers"}
@@ -166,9 +191,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between rounded-md border border-destructive/30 p-4">
             <div>
               <p className="font-medium">Delete this agent</p>
-              <p className="text-muted-foreground text-sm">
-                Permanently delete this agent and all associated data.
-              </p>
+              <p className="text-muted-foreground text-sm">Permanently delete this agent and all associated data.</p>
             </div>
             <AlertDialog>
               <AlertDialogTrigger asChild>

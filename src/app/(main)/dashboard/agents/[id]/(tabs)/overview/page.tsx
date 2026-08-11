@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { useParams } from "next/navigation";
+
 import { Bot, Calendar, Copy, ExternalLink, MessageSquare, Pause, Play, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { getAgentById, updateAgent } from "@/lib/auth/actions/agent.actions";
 import type { AgentEntity } from "@/lib/db/entities";
 import { getAgentFromStorage, saveAgentToStorage } from "@/lib/db/storage-helper";
 
@@ -29,9 +32,27 @@ export default function OverviewPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const found = getAgentFromStorage(agentId);
-    if (found) setAgent(found);
-    setIsLoading(false);
+    let cancelled = false;
+    const load = async () => {
+      const local = getAgentFromStorage(agentId);
+      try {
+        const result = await getAgentById(agentId);
+        if (result.success && result.agent) {
+          saveAgentToStorage(result.agent as AgentEntity);
+          if (!cancelled) setAgent(result.agent as AgentEntity);
+          if (!cancelled) setIsLoading(false);
+          return;
+        }
+      } catch {
+        // fall through
+      }
+      if (!cancelled) setAgent(local);
+      if (!cancelled) setIsLoading(false);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [agentId]);
 
   async function toggleStatus() {
@@ -40,7 +61,12 @@ export default function OverviewPage() {
     const updated: AgentEntity = { ...agent, status: newStatus, date_updated: new Date().toISOString() };
     saveAgentToStorage(updated);
     setAgent(updated);
-    toast.success(`Agent ${newStatus === "active" ? "activated" : "paused"}.`);
+    const result = await updateAgent(agentId, { status: newStatus });
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success(`Agent ${newStatus === "active" ? "activated" : "paused"}.`);
+    }
   }
 
   function copyPublicLink() {
@@ -50,7 +76,7 @@ export default function OverviewPage() {
   }
 
   function copyEmbedCode() {
-    const code = `<script src="${window.location.origin}/widget.js" data-agent="${agentId}"><\/script>`;
+    const code = `<script src="${window.location.origin}/widget.js" data-agent="${agentId}"></script>`;
     navigator.clipboard.writeText(code);
     toast.success("Embed code copied!");
   }
@@ -75,11 +101,7 @@ export default function OverviewPage() {
     <div className="space-y-6">
       {/* Quick Actions */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button
-          variant={agent.status === "active" ? "default" : "outline"}
-          size="sm"
-          onClick={toggleStatus}
-        >
+        <Button variant={agent.status === "active" ? "default" : "outline"} size="sm" onClick={toggleStatus}>
           {agent.status === "active" ? (
             <>
               <Pause className="size-3.5" />
@@ -101,7 +123,9 @@ export default function OverviewPage() {
           Embed Code
         </Button>
         <div className="ml-auto flex items-center gap-2">
-          <span className={`size-2 rounded-full ${agent.status === "active" ? "bg-green-500" : agent.status === "paused" ? "bg-yellow-500" : "bg-muted-foreground"}`} />
+          <span
+            className={`size-2 rounded-full ${agent.status === "active" ? "bg-green-500" : agent.status === "paused" ? "bg-yellow-500" : "bg-muted-foreground"}`}
+          />
           <span className="text-sm capitalize">{agent.status}</span>
         </div>
       </div>

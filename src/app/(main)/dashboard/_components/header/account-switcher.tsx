@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+
 import { BadgeCheck, Bell, CreditCard, LogOut } from "lucide-react";
-import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -15,15 +14,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { signOutAction } from "@/lib/auth/auth-actions";
 
 export function AccountSwitcher() {
-  const router = useRouter();
-
-  function handleLogout() {
-    toast.success("Logged out successfully");
-    router.push("/auth/v1/login");
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -60,9 +53,13 @@ export function AccountSwitcher() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-          <LogOut />
-          Log out
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <form action={signOutAction} className="w-full">
+            <button type="submit" className="flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-sm">
+              <LogOut />
+              <span>Log out</span>
+            </button>
+          </form>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
