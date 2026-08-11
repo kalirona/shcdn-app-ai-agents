@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { getAgentById } from "@/lib/auth/actions/agent.actions";
+import { getAgentById } from "@/lib/db/repositories/agent.repo";
 import { widgetConfigSchema } from "@/lib/auth/schemas/widget.schema";
 
 function getAllowedOrigins(): string[] {
@@ -36,12 +36,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
   }
 
-  const agentResult = await getAgentById(agentId);
-  if (!agentResult.agent) {
+  const agent = await getAgentById(agentId);
+  if (!agent) {
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });
   }
-
-  const agent = agentResult.agent;
 
   return NextResponse.json({
     agentId: agent.id,

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { ragQuery } from "@/lib/ai/rag-pipeline";
-import { getAgentById } from "@/lib/auth/actions/agent.actions";
+import { getAgentById } from "@/lib/db/repositories/agent.repo";
 import { widgetChatSchema } from "@/lib/auth/schemas/widget.schema";
 import { checkRateLimit } from "@/lib/security/rate-limiter";
 
@@ -26,12 +26,10 @@ export async function POST(request: NextRequest) {
 
     const { agentId, sessionId, message } = parsed.data;
 
-    const agentResult = await getAgentById(agentId);
-    if (!agentResult.agent) {
+    const agent = await getAgentById(agentId);
+    if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
-
-    const agent = agentResult.agent;
 
     if (agent.status !== "active") {
       return NextResponse.json({ error: "Agent is not active" }, { status: 400 });

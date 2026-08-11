@@ -4,8 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { Bot, Loader2, Send } from "lucide-react";
 
-import type { AgentEntity } from "@/lib/db/entities";
-import { getAgentFromStorage } from "@/lib/db/storage-helper";
+interface PublicAgent {
+  id: string;
+  name: string;
+  description: string | null;
+  greeting: string;
+  fallback_message: string;
+  tone: string;
+  language: string;
+  system_prompt: string | null;
+  status: string;
+  workspace: string;
+}
 
 interface PublicMessage {
   role: "user" | "assistant";
@@ -16,7 +26,7 @@ interface PublicMessage {
 export default function PublicAgentPage() {
   const params = useParams();
   const agentId = params.agent as string;
-  const [agent, setAgent] = useState<AgentEntity | null>(null);
+  const [agent, setAgent] = useState<PublicAgent | null>(null);
   const [messages, setMessages] = useState<PublicMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -24,12 +34,20 @@ export default function PublicAgentPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const found = getAgentFromStorage(agentId);
-    if (found) {
-      setAgent(found);
-      setMessages([{ role: "assistant", content: found.greeting }]);
-    }
-    setIsPageLoading(false);
+    fetch(`/api/agents/${agentId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) {
+          setIsPageLoading(false);
+          return;
+        }
+        setAgent(data);
+        setMessages([{ role: "assistant", content: data.greeting }]);
+        setIsPageLoading(false);
+      })
+      .catch(() => {
+        setIsPageLoading(false);
+      });
   }, [agentId]);
 
   useEffect(() => {
