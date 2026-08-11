@@ -13,5 +13,5 @@ export async function signOutAction() {
 }
 
 export async function signUpAction() {
-  await signIn(logtoConfig, `${logtoConfig.baseUrl}/callback?interaction-mode=sign-up`);
+  await signIn(logtoConfig, `${logtoConfig.baseUrl}/callback`, "signUp");
 }
