@@ -6,6 +6,11 @@ This guide tells you exactly which Directus collections to create and how, so th
 2. Link each user to their workspace via a membership with an **owner** role
 3. Keep every user's data (agents, knowledge, conversations) fully separated per workspace
 
+> **Quick setup:** You can create ALL collections automatically by running
+> `node scripts/directus-setup.mjs` (it reads `DIRECTUS_URL` / `DIRECTUS_TOKEN`
+> from `.env.local`). It is idempotent - safe to re-run. The rest of this doc
+> documents what it creates, and the manual steps if you prefer the admin UI.
+
 ---
 
 ## Data model
