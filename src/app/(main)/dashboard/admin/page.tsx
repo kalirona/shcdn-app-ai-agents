@@ -1,34 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Activity,
-  AlertTriangle,
-  BarChart3,
-  Bot,
-  DollarSign,
-  Settings,
-  Shield,
-  Users,
-} from "lucide-react";
+import { useEffect, useState } from "react";
 
-interface AdminStats {
-  totalUsers: number;
-  totalWorkspaces: number;
-  totalAgents: number;
-  totalConversations: number;
-  totalRevenue: number;
-  activeSubscriptions: number;
-}
+import { Activity, AlertTriangle, BarChart3, Bot, DollarSign, Loader2, Shield, Users } from "lucide-react";
 
-const mockStats: AdminStats = {
-  totalUsers: 1,
-  totalWorkspaces: 1,
-  totalAgents: 0,
-  totalConversations: 0,
-  totalRevenue: 0,
-  activeSubscriptions: 0,
-};
+import type { PlatformStats } from "@/lib/auth/actions/admin/admin.actions";
+import { getPlatformStats } from "@/lib/auth/actions/admin/admin.actions";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: BarChart3 },
@@ -39,7 +16,17 @@ const tabs = [
   { id: "audit", label: "Audit Logs", icon: Shield },
 ];
 
-function StatCard({ label, value, icon: Icon, subtext }: { label: string; value: string | number; icon: React.ElementType; subtext?: string }) {
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  subtext,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ElementType;
+  subtext?: string;
+}) {
   return (
     <div className="rounded-xl border bg-background p-5">
       <div className="flex items-center gap-3">
@@ -58,6 +45,41 @@ function StatCard({ label, value, icon: Icon, subtext }: { label: string; value:
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [stats, setStats] = useState<PlatformStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadStats = async () => {
+      try {
+        const result = await getPlatformStats();
+        if (!cancelled) {
+          setStats(result);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadStats();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (isLoading || !stats) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -75,10 +97,8 @@ export default function AdminPage() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted"
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-sm transition-colors ${
+                activeTab === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
               }`}
             >
               <Icon className="size-4" />
@@ -92,12 +112,12 @@ export default function AdminPage() {
       {activeTab === "overview" && (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <StatCard label="Total Users" value={mockStats.totalUsers} icon={Users} />
-            <StatCard label="Workspaces" value={mockStats.totalWorkspaces} icon={Bot} />
-            <StatCard label="AI Agents" value={mockStats.totalAgents} icon={Bot} />
-            <StatCard label="Conversations" value={mockStats.totalConversations} icon={Activity} />
-            <StatCard label="Revenue" value={`$${mockStats.totalRevenue}`} icon={DollarSign} />
-            <StatCard label="Active Subscriptions" value={mockStats.activeSubscriptions} icon={DollarSign} />
+            <StatCard label="Total Users" value={stats.totalUsers} icon={Users} />
+            <StatCard label="Workspaces" value={stats.totalWorkspaces} icon={Bot} />
+            <StatCard label="AI Agents" value={stats.totalAgents} icon={Bot} />
+            <StatCard label="Conversations" value={stats.totalConversations} icon={Activity} />
+            <StatCard label="Revenue" value={`$${stats.totalRevenue}`} icon={DollarSign} />
+            <StatCard label="Active Subscriptions" value={stats.activeSubscriptions} icon={DollarSign} />
           </div>
 
           <div className="rounded-xl border bg-background p-6">
@@ -127,27 +147,14 @@ export default function AdminPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-medium">Users</h3>
-            <span className="text-muted-foreground text-sm">{mockStats.totalUsers} users</span>
+            <span className="text-muted-foreground text-sm">{stats.totalUsers} users</span>
           </div>
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium text-sm">User</th>
-                  <th className="px-4 py-3 text-left font-medium text-sm">Role</th>
-                  <th className="px-4 py-3 text-left font-medium text-sm">Status</th>
-                  <th className="px-4 py-3 text-left font-medium text-sm">Joined</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="px-4 py-3 text-sm">Dev User</td>
-                  <td className="px-4 py-3 text-sm">Admin</td>
-                  <td className="px-4 py-3"><span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-green-700 text-xs">Active</span></td>
-                  <td className="px-4 py-3 text-muted-foreground text-sm">{new Date().toLocaleDateString()}</td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="rounded-xl border bg-background p-6">
+            <div className="flex flex-col items-center justify-center py-8">
+              <Users className="size-12 text-muted-foreground" />
+              <p className="mt-4 font-medium">No user details yet</p>
+              <p className="text-muted-foreground text-sm">User profiles will appear here as they sign up.</p>
+            </div>
           </div>
         </div>
       )}
@@ -157,27 +164,14 @@ export default function AdminPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-medium">Workspaces</h3>
-            <span className="text-muted-foreground text-sm">{mockStats.totalWorkspaces} workspaces</span>
+            <span className="text-muted-foreground text-sm">{stats.totalWorkspaces} workspaces</span>
           </div>
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium text-sm">Workspace</th>
-                  <th className="px-4 py-3 text-left font-medium text-sm">Plan</th>
-                  <th className="px-4 py-3 text-left font-medium text-sm">Agents</th>
-                  <th className="px-4 py-3 text-left font-medium text-sm">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="px-4 py-3 text-sm">Main Workspace</td>
-                  <td className="px-4 py-3 text-sm">Starter</td>
-                  <td className="px-4 py-3 text-sm">{mockStats.totalAgents}</td>
-                  <td className="px-4 py-3"><span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-green-700 text-xs">Active</span></td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="rounded-xl border bg-background p-6">
+            <div className="flex flex-col items-center justify-center py-8">
+              <Bot className="size-12 text-muted-foreground" />
+              <p className="mt-4 font-medium">No workspaces yet</p>
+              <p className="text-muted-foreground text-sm">Workspaces will appear here as teams sign up.</p>
+            </div>
           </div>
         </div>
       )}
@@ -187,7 +181,7 @@ export default function AdminPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-medium">Subscriptions</h3>
-            <span className="text-muted-foreground text-sm">{mockStats.activeSubscriptions} active</span>
+            <span className="text-muted-foreground text-sm">{stats.activeSubscriptions} active</span>
           </div>
           <div className="rounded-xl border bg-background p-6">
             <div className="flex flex-col items-center justify-center py-8">
@@ -228,31 +222,12 @@ export default function AdminPage() {
       {activeTab === "audit" && (
         <div className="space-y-4">
           <h3 className="font-medium">Audit Logs</h3>
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium text-sm">Event</th>
-                  <th className="px-4 py-3 text-left font-medium text-sm">User</th>
-                  <th className="px-4 py-3 text-left font-medium text-sm">Date</th>
-                  <th className="px-4 py-3 text-left font-medium text-sm">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="px-4 py-3 text-sm">User registered</td>
-                  <td className="px-4 py-3 text-sm">dev@localhost.com</td>
-                  <td className="px-4 py-3 text-muted-foreground text-sm">{new Date().toLocaleString()}</td>
-                  <td className="px-4 py-3"><span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-green-700 text-xs">Success</span></td>
-                </tr>
-                <tr className="border-b">
-                  <td className="px-4 py-3 text-sm">Workspace created</td>
-                  <td className="px-4 py-3 text-sm">dev@localhost.com</td>
-                  <td className="px-4 py-3 text-muted-foreground text-sm">{new Date().toLocaleString()}</td>
-                  <td className="px-4 py-3"><span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-green-700 text-xs">Success</span></td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="rounded-xl border bg-background p-6">
+            <div className="flex flex-col items-center justify-center py-8">
+              <AlertTriangle className="size-12 text-muted-foreground" />
+              <p className="mt-4 font-medium">No audit events yet</p>
+              <p className="text-muted-foreground text-sm">Sign-in and workspace events will appear here.</p>
+            </div>
           </div>
         </div>
       )}

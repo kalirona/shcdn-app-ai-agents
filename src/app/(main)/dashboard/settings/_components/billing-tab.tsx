@@ -6,7 +6,7 @@ export function BillingTab() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-medium">Subscription</h3>
-          <p className="text-muted-foreground text-sm">Manage your plan and payment methods.</p>
+          <p className="text-muted-foreground text-sm">Your workspace billing status.</p>
         </div>
         <a href="/dashboard/settings/billing" className="text-primary text-sm hover:underline">
           Manage billing →
@@ -14,13 +14,13 @@ export function BillingTab() {
       </div>
       <div className="rounded-lg border bg-background p-6">
         <p className="text-muted-foreground text-sm">
-          You are currently on the <strong>free trial</strong>. Upgrade to unlock all features.
+          You&apos;re currently on the <strong>free trial</strong>.
         </p>
         <a
-          href="/dashboard/settings/billing"
+          href={`mailto:sales@${new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://example.com").hostname}?subject=${encodeURIComponent("Upgrade to a paid plan")}`}
           className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-primary-foreground text-sm"
         >
-          View Plans
+          Contact us to upgrade
         </a>
       </div>
     </div>

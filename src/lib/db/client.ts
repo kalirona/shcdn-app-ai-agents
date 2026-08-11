@@ -117,6 +117,8 @@ export const db = {
 
     getById: (id: string) => request<MembershipEntity>(`/memberships/${id}`),
 
+    getMany: (query?: DirectusQuery) => request<MembershipEntity[]>("/memberships", {}, query),
+
     getByWorkspace: (workspaceId: string) =>
       request<MembershipEntity[]>(
         "/memberships",
@@ -153,6 +155,8 @@ export const db = {
       }),
 
     getById: (id: string) => request<AgentEntity>(`/agents/${id}`),
+
+    getMany: (query?: DirectusQuery) => request<AgentEntity[]>("/agents", {}, query),
 
     getByWorkspace: (workspaceId: string) =>
       request<AgentEntity[]>(
@@ -249,6 +253,8 @@ export const db = {
       }),
 
     getById: (id: string) => request<ConversationEntity>(`/conversations/${id}`),
+
+    getMany: (query?: DirectusQuery) => request<ConversationEntity[]>("/conversations", {}, query),
 
     getByWorkspace: (workspaceId: string, status?: string) =>
       request<ConversationEntity[]>(

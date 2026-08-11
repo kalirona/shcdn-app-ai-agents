@@ -27,7 +27,7 @@ export function DangerZoneTab() {
     setIsDeleting(true);
     await new Promise((resolve) => setTimeout(resolve, 800));
     setIsDeleting(false);
-    toast.error("Workspace deletion is not available in this demo yet.");
+    toast.error("Workspace deletion is not available yet.");
   }
 
   return (
