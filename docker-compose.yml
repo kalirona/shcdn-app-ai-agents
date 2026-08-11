@@ -34,6 +34,12 @@ services:
       - R2_BUCKET_NAME=${R2_BUCKET_NAME}
       - R2_PUBLIC_URL=${R2_PUBLIC_URL}
     restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.web.rule=Host(`myapp.sitenexai.com`)
+      - traefik.http.routers.web.entrypoints=websecure
+      - traefik.http.routers.web.tls=true
+      - traefik.http.services.web.loadbalancer.server.port=9000
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:9000/api/health || exit 1"]
       interval: 30s
