@@ -120,9 +120,9 @@ export interface CustomerEntity {
   phone: string | null;
   company: string | null;
   stage: "anonymous" | "lead" | "customer";
-  conversations: string[];
-  leads: string[];
-  bookings: string[];
+  conversations?: string[];
+  leads?: string[];
+  bookings?: string[];
   notes: string | null;
   date_created: string;
   date_updated: string;

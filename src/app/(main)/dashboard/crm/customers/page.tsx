@@ -1,42 +1,46 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  DollarSign,
-  Loader2,
-  Mail,
-  MessageSquare,
-  Phone,
-  Plus,
-  User,
-} from "lucide-react";
-import { toast } from "sonner";
+
+import { Loader2, Mail, MessageSquare, Phone, User } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { getCustomersFromStorage } from "@/lib/db/crm-storage";
-
-interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  phone: string | null;
-  company: string | null;
-  totalConversations: number;
-  totalBookings: number;
-  totalValue: number;
-  lastContact: string;
-  dateCreated: string;
-}
+import { getWorkspaceCustomers } from "@/lib/auth/actions/crm/customer.actions";
+import { getCurrentUser } from "@/lib/auth/actions/user.actions";
+import type { CustomerAggregate } from "@/lib/db/repositories/customer.repo";
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerAggregate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setCustomers(getCustomersFromStorage());
-    setIsLoading(false);
+    let cancelled = false;
+
+    const loadCustomers = async () => {
+      try {
+        const user = await getCurrentUser();
+        const ws = user.currentWorkspace;
+        if (!ws) {
+          return;
+        }
+        const result = await getWorkspaceCustomers(ws.id);
+        if (!cancelled && result.customers) {
+          setCustomers(result.customers);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadCustomers();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (isLoading) {
@@ -73,7 +77,6 @@ export default function CustomersPage() {
                 <th className="px-4 py-3 text-left font-medium text-sm">Contact</th>
                 <th className="px-4 py-3 text-left font-medium text-sm">Conversations</th>
                 <th className="px-4 py-3 text-left font-medium text-sm">Bookings</th>
-                <th className="px-4 py-3 text-left font-medium text-sm">Value</th>
                 <th className="px-4 py-3 text-left font-medium text-sm">Last Contact</th>
               </tr>
             </thead>
@@ -83,15 +86,11 @@ export default function CustomersPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <Avatar className="size-8">
-                        <AvatarFallback className="text-xs">
-                          {customer.name.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
+                        <AvatarFallback className="text-xs">{customer.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-medium text-sm">{customer.name}</p>
-                        {customer.company && (
-                          <p className="text-muted-foreground text-xs">{customer.company}</p>
-                        )}
+                        {customer.company && <p className="text-muted-foreground text-xs">{customer.company}</p>}
                       </div>
                     </div>
                   </td>
@@ -116,12 +115,6 @@ export default function CustomersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm">{customer.totalBookings}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className="flex items-center gap-1">
-                      <DollarSign className="size-3 text-muted-foreground" />
-                      {customer.totalValue}
-                    </span>
-                  </td>
                   <td className="px-4 py-3 text-muted-foreground text-sm">
                     {new Date(customer.lastContact).toLocaleDateString()}
                   </td>
