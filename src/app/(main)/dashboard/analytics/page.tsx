@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import {
+  AlertCircle,
   Bot,
   Calendar,
   CheckCircle,
@@ -12,13 +14,11 @@ import {
   UserCheck,
   Users,
   XCircle,
-  AlertCircle,
 } from "lucide-react";
 
-import { getWorkspaceAnalytics } from "@/lib/auth/actions/analytics/analytics.actions";
 import type { AnalyticsKPIs, TopQuestion, UnansweredQuestion } from "@/lib/auth/actions/analytics/analytics.actions";
-
-const WORKSPACE_ID = "placeholder-workspace-id";
+import { getWorkspaceAnalytics } from "@/lib/auth/actions/analytics/analytics.actions";
+import { getCurrentUser } from "@/lib/auth/actions/user.actions";
 
 interface KPICardProps {
   label: string;
@@ -31,9 +31,7 @@ function KPICard({ label, value, icon, subtext }: KPICardProps) {
   return (
     <div className="rounded-lg border bg-background p-4">
       <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-          {icon}
-        </div>
+        <div className="flex size-10 items-center justify-center rounded-lg bg-muted">{icon}</div>
         <div>
           <p className="text-muted-foreground text-sm">{label}</p>
           <p className="font-semibold text-2xl">{value}</p>
@@ -51,17 +49,35 @@ export default function AnalyticsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadAnalytics = async () => {
-      const result = await getWorkspaceAnalytics(WORKSPACE_ID);
-      if (result.kpis) {
-        setKpis(result.kpis);
-        setTopQuestions(result.topQuestions);
-        setUnansweredQuestions(result.unansweredQuestions);
+      try {
+        const user = await getCurrentUser();
+        const ws = user.currentWorkspace;
+        if (!ws) {
+          return;
+        }
+        const result = await getWorkspaceAnalytics(ws.id);
+        if (!cancelled && result.kpis) {
+          setKpis(result.kpis);
+          setTopQuestions(result.topQuestions);
+          setUnansweredQuestions(result.unansweredQuestions);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
     };
 
-    loadAnalytics();
+    void loadAnalytics();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (isLoading) {
@@ -152,14 +168,15 @@ export default function AnalyticsPage() {
           {unansweredQuestions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8">
               <CheckCircle className="size-8 text-green-500" />
-              <p className="mt-2 text-muted-foreground text-sm">
-                All questions have been answered! Great job.
-              </p>
+              <p className="mt-2 text-muted-foreground text-sm">All questions have been answered! Great job.</p>
             </div>
           ) : (
             <div className="space-y-2">
               {unansweredQuestions.map((q, i) => (
-                <div key={i} className="flex items-center justify-between rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2">
+                <div
+                  key={i}
+                  className="flex items-center justify-between rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2"
+                >
                   <span className="text-sm">{q.question}</span>
                   <span className="text-muted-foreground text-xs">{q.date}</span>
                 </div>

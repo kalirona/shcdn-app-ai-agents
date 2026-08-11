@@ -4,27 +4,11 @@ import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
-import {
-  AlertCircle,
-  ArrowLeft,
-  Bot,
-  Check,
-  Download,
-  Loader2,
-  MessageSquare,
-  Search,
-  User,
-  UserX,
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, Bot, Check, Loader2, User } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { exportConversations, getWorkspaceConversations } from "@/lib/auth/actions/conversation/conversation.actions";
 import type { ConversationEntity, MessageEntity } from "@/lib/db/entities";
-
-const WORKSPACE_ID = "placeholder-workspace-id";
 
 function StatusBadge({ status }: { status: ConversationEntity["status"] }) {
   const config: Record<ConversationEntity["status"], { label: string; color: string }> = {
@@ -59,7 +43,7 @@ export default function ConversationDetailPage({ params }: { params: { id: strin
       setIsLoading(false);
     };
 
-    loadConversation();
+    void loadConversation();
   }, [id]);
 
   async function handleReply() {
