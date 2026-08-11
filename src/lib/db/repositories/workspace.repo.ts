@@ -9,14 +9,43 @@ export interface CreateWorkspaceParams {
   ownerId: string;
 }
 
+function slugifyName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
 export async function createWorkspaceWithOwner(params: CreateWorkspaceParams) {
-  const workspace = await db.workspace.create({
-    name: params.name,
-    slug: params.slug,
-    description: params.description ?? null,
-    logo: null,
-    website: params.website ?? null,
-  });
+  const baseSlug = slugifyName(params.slug) || "workspace";
+
+  // Ensure a unique slug even if another workspace already used it
+  // (e.g. two users both named "John"). Retry with a numeric suffix.
+  let slug = baseSlug;
+  let attempt = 0;
+  let workspace = null;
+  while (!workspace) {
+    try {
+      workspace = await db.workspace.create({
+        name: params.name,
+        slug,
+        description: params.description ?? null,
+        logo: null,
+        website: params.website ?? null,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      const isDuplicate =
+        message.includes("duplicate") || message.includes("unique") || message.includes("already exists");
+      if (attempt >= 10 || !isDuplicate) {
+        throw error;
+      }
+      attempt += 1;
+      const suffix = Math.random().toString(36).slice(2, 8);
+      slug = `${baseSlug.slice(0, 56)}-${suffix}`;
+    }
+  }
 
   await db.membership.create({
     workspace: workspace.id,
