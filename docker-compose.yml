@@ -36,12 +36,17 @@ services:
     restart: unless-stopped
     labels:
       - traefik.enable=true
-      - traefik.http.routers.web.rule=Host(`myapp.sitenexai.com`)
-      - traefik.http.routers.web.entrypoints=websecure
-      - traefik.http.routers.web.tls=true
-      - traefik.http.services.web.loadbalancer.server.port=9000
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-web.rule=Host(`myapp.sitenexai.com`)
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-web.entrypoints=websecure
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-web.tls=true
+      - traefik.http.services.aiagentappshdcn-aiapp-hqg74c-web.loadbalancer.server.port=9000
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:9000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+networks:
+  default:
+    name: dokploy-network
+    external: true
