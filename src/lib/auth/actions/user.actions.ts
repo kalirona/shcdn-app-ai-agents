@@ -7,6 +7,7 @@ export interface CurrentUserResult {
   user: { id: string; email: string; name: string | null; avatar: string | null };
   workspaces: { id: string; name: string; slug: string }[];
   currentWorkspace: { id: string; name: string; slug: string } | null;
+  isSuperAdmin: boolean;
 }
 
 function toWorkspaceSummary(workspace: { id: string; name: string; slug: string }) {
@@ -14,10 +15,15 @@ function toWorkspaceSummary(workspace: { id: string; name: string; slug: string 
 }
 
 export async function getCurrentUser(): Promise<CurrentUserResult> {
-  const { isAuthenticated, user } = await getAuthContext();
+  const { isAuthenticated, user, isSuperAdmin } = await getAuthContext();
 
   if (!isAuthenticated || !user) {
-    return { user: { id: "", email: "", name: null, avatar: null }, workspaces: [], currentWorkspace: null };
+    return {
+      user: { id: "", email: "", name: null, avatar: null },
+      workspaces: [],
+      currentWorkspace: null,
+      isSuperAdmin: false,
+    };
   }
 
   let workspaces = await getUserWorkspaces(user.id);
@@ -50,5 +56,6 @@ export async function getCurrentUser(): Promise<CurrentUserResult> {
     user,
     workspaces: summaries,
     currentWorkspace: summaries[0] ?? null,
+    isSuperAdmin,
   };
 }

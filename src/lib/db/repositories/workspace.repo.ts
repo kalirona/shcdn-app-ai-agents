@@ -98,3 +98,23 @@ export async function updateWorkspace(
 export async function deleteWorkspace(id: string): Promise<void> {
   await db.workspace.delete(id);
 }
+
+export async function getAllWorkspaces(): Promise<WorkspaceEntity[]> {
+  return db.workspace.getMany({
+    sort: ["-date_created"],
+  });
+}
+
+export async function getWorkspacesByPlan(plan: string): Promise<WorkspaceEntity[]> {
+  return db.workspace.getMany({
+    filter: { plan: { _eq: plan } },
+    sort: ["-date_created"],
+  });
+}
+
+export async function getWorkspacesBySubscriptionStatus(status: string): Promise<WorkspaceEntity[]> {
+  return db.workspace.getMany({
+    filter: { subscription_status: { _eq: status } },
+    sort: ["-date_created"],
+  });
+}

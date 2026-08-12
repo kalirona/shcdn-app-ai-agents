@@ -8,8 +8,10 @@ import type {
   LeadEntity,
   MembershipEntity,
   MessageEntity,
+  PlatformRoleEntity,
   WebhookDeliveryEntity,
   WebhookEntity,
+  WebhookEventEntity,
   WorkspaceEntity,
 } from "./entities";
 
@@ -457,5 +459,58 @@ export const db = {
       ),
 
     getMany: (query?: DirectusQuery) => request<WebhookDeliveryEntity[]>("/webhook_deliveries", {}, query),
+  },
+
+  webhookEvent: {
+    create: (data: Omit<WebhookEventEntity, "id" | "date_created" | "date_updated">) =>
+      request<WebhookEventEntity>("/webhook_events", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    getByEventId: (provider: string, eventId: string) =>
+      request<WebhookEventEntity[]>(
+        "/webhook_events",
+        {},
+        {
+          filter: { provider: { _eq: provider }, event_id: { _eq: eventId } },
+          limit: 1,
+        },
+      ),
+
+    getMany: (query?: DirectusQuery) => request<WebhookEventEntity[]>("/webhook_events", {}, query),
+  },
+
+  platformRole: {
+    create: (
+      data: Omit<PlatformRoleEntity, "id" | "date_created" | "date_updated" | "status"> & {
+        status?: "active" | "inactive";
+      },
+    ) =>
+      request<PlatformRoleEntity>("/platform_roles", {
+        method: "POST",
+        body: JSON.stringify({ ...data, status: data.status ?? "active" }),
+      }),
+
+    getById: (id: string) => request<PlatformRoleEntity>(`/platform_roles/${id}`),
+
+    getMany: (query?: DirectusQuery) => request<PlatformRoleEntity[]>("/platform_roles", {}, query),
+
+    getByUser: (userId: string) =>
+      request<PlatformRoleEntity[]>(
+        "/platform_roles",
+        {},
+        {
+          filter: { user: { _eq: userId } },
+        },
+      ),
+
+    update: (id: string, data: Partial<PlatformRoleEntity>) =>
+      request<PlatformRoleEntity>(`/platform_roles/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    delete: (id: string) => request<void>(`/platform_roles/${id}`, { method: "DELETE" }),
   },
 };

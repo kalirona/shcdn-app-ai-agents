@@ -202,3 +202,32 @@ export interface WebhookDeliveryEntity {
   date_created: string;
   date_updated: string;
 }
+
+/**
+ * Idempotency ledger for INBOUND provider webhook events (e.g. PayPal).
+ * One row per processed provider event ID so duplicate deliveries are ignored.
+ */
+export interface WebhookEventEntity {
+  id: string;
+  event_id: string;
+  provider: string;
+  event_type: string;
+  subscription_id: string | null;
+  workspace: string | null;
+  status: "processed" | "failed";
+  date_created: string;
+  date_updated: string;
+}
+
+/**
+ * Platform-level role assignments (Super Admin).
+ * Separate from workspace-level team_memberships.
+ */
+export interface PlatformRoleEntity {
+  id: string;
+  user: string;
+  role: "super_admin";
+  status: "active" | "inactive";
+  date_created: string;
+  date_updated: string;
+}

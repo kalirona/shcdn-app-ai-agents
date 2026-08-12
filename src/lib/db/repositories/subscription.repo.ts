@@ -12,6 +12,27 @@ export interface SubscriptionFields {
   cancelAtPeriodEnd: boolean;
 }
 
+/**
+ * Resolves the workspace that owns a given provider subscription ID.
+ *
+ * This is the authoritative server-side mapping used by inbound webhooks:
+ *   PayPal subscription ID -> Agent AI workspace.
+ * The browser never supplies the workspace for a webhook.
+ */
+export async function getWorkspaceByProviderSubscriptionId(
+  provider: string,
+  providerSubscriptionId: string,
+): Promise<WorkspaceEntity | null> {
+  const workspaces = await db.workspace.getMany({
+    filter: {
+      payment_provider: { _eq: provider },
+      payment_provider_subscription_id: { _eq: providerSubscriptionId },
+    },
+    limit: 1,
+  });
+  return workspaces[0] ?? null;
+}
+
 export async function getSubscriptionByWorkspace(workspaceId: string): Promise<SubscriptionFields | null> {
   const workspace = await db.workspace.getById(workspaceId);
   if (!workspace) return null;

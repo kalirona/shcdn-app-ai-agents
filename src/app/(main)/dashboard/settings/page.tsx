@@ -2,15 +2,7 @@
 
 import { useState } from "react";
 
-import {
-  AlertTriangle,
-  Bell,
-  CreditCard,
-  KeyRound,
-  Puzzle,
-  Settings as SettingsIcon,
-  Users,
-} from "lucide-react";
+import { AlertTriangle, Bell, CreditCard, KeyRound, Settings as SettingsIcon, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -18,7 +10,6 @@ import { ApiKeysTab } from "./_components/api-keys-tab";
 import { BillingTab } from "./_components/billing-tab";
 import { BusinessProfileForm } from "./_components/business-profile-form";
 import { DangerZoneTab } from "./_components/danger-zone-tab";
-import { IntegrationsTab } from "./_components/integrations-tab";
 import { NotificationsTab } from "./_components/notifications-tab";
 import { RoleManagement } from "./_components/role-management";
 
@@ -29,7 +20,6 @@ const navSections = [
       { value: "profile", label: "Business Profile", icon: SettingsIcon },
       { value: "members", label: "Members & Roles", icon: Users },
       { value: "billing", label: "Billing", icon: CreditCard },
-      { value: "integrations", label: "Integrations", icon: Puzzle },
       { value: "api-keys", label: "API Keys", icon: KeyRound },
       { value: "notifications", label: "Notifications", icon: Bell },
     ],
@@ -46,7 +36,6 @@ const content: Record<NavValue, () => React.JSX.Element> = {
   profile: BusinessProfileForm,
   members: RoleManagement,
   billing: BillingTab,
-  integrations: IntegrationsTab,
   "api-keys": ApiKeysTab,
   notifications: NotificationsTab,
   "danger-zone": DangerZoneTab,
@@ -73,7 +62,7 @@ export default function SettingsPage() {
               key={section.label ?? sectionIndex}
               className={cn(
                 "flex shrink-0 gap-1 md:flex-col md:gap-0.5",
-                sectionIndex > 0 && "md:mt-4 md:border-t md:pt-4"
+                sectionIndex > 0 && "md:mt-4 md:border-t md:pt-4",
               )}
             >
               {section.label && (
@@ -93,7 +82,7 @@ export default function SettingsPage() {
                     className={cn(
                       "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
                       "text-muted-foreground hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                      isActive && "bg-muted text-foreground"
+                      isActive && "bg-muted text-foreground",
                     )}
                   >
                     <Icon className="size-4 shrink-0" />

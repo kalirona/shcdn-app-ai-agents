@@ -1,4 +1,5 @@
 import type { PlanName } from "@/lib/auth/schemas/billing.schema";
+import { classifyPayPalEvent, extractSubscriptionId, getPayPalPlanId } from "@/lib/paypal";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
@@ -242,154 +243,91 @@ function createStripeProvider(): PaymentProviderAdapter {
 }
 
 function createPayPalProvider(): PaymentProviderAdapter {
-  const payPalAuthHeader = () =>
-    `Basic ${Buffer.from(`${process.env.PAYPAL_CLIENT_ID ?? ""}:${process.env.PAYPAL_CLIENT_SECRET ?? ""}`).toString(
-      "base64",
-    )}`;
-
-  const payPalBaseUrl = () =>
-    process.env.PAYPAL_MODE === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
-
-  async function getPayPalAccessToken(): Promise<string> {
-    const response = await fetch(`${payPalBaseUrl()}/v1/oauth2/token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: payPalAuthHeader(),
-      },
-      body: "grant_type=client_credentials",
-    });
-
-    if (!response.ok) {
-      throw new Error("PayPal authentication failed");
-    }
-
-    const data = await response.json();
-    return data.access_token;
-  }
-
   return {
     async createCheckoutSession(plan, workspaceId, customerEmail) {
-      const accessToken = await getPayPalAccessToken();
-
-      const orderResponse = await fetch(`${payPalBaseUrl()}/v2/checkout/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          intent: "CAPTURE",
-          purchase_units: [
-            {
-              amount: {
-                currency_code: "USD",
-                value: getPayPalPrice(plan),
-              },
-              custom_id: workspaceId,
-            },
-          ],
-          payment_source: {
-            paypal: {
-              email_address: customerEmail,
-            },
-          },
-        }),
+      const { createPayPalSubscription } = await import("@/lib/paypal");
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const created = await createPayPalSubscription({
+        plan,
+        workspaceId,
+        customerEmail,
+        returnUrl: `${baseUrl}/dashboard/settings/billing?paypal=success`,
+        cancelUrl: `${baseUrl}/dashboard/settings/billing?paypal=cancelled`,
       });
 
-      if (!orderResponse.ok) {
-        const error = await orderResponse.text();
-        throw new Error(`PayPal order error: ${error}`);
-      }
-
-      const orderData = await orderResponse.json();
-      const approvalLink = orderData.links?.find((l: { rel: string }) => l.rel === "payer-action");
-
       return {
-        url: approvalLink?.href ?? "",
-        sessionId: orderData.id,
+        url: created.approveUrl,
+        sessionId: created.id,
       };
     },
 
     async createCustomerPortalSession(workspaceId) {
-      // PayPal doesn't have a native portal, redirect to PayPal account
-      return process.env.PAYPAL_MODE === "live"
+      // PayPal doesn't have a native portal; the customer manages the
+      // subscription from their PayPal account.
+      const { getPayPalEnvironment } = await import("@/lib/paypal");
+      return getPayPalEnvironment() === "live"
         ? "https://www.paypal.com/myaccount/autopay"
         : "https://www.sandbox.paypal.com/myaccount/autopay";
     },
 
     async cancelSubscription(subscriptionId) {
-      const accessToken = await getPayPalAccessToken();
-
-      const response = await fetch(`${payPalBaseUrl()}/v1/billing/subscriptions/${subscriptionId}/cancel`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ reason: "Customer requested cancellation" }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`PayPal cancel error: ${error}`);
-      }
+      const { cancelPayPalSubscription } = await import("@/lib/paypal");
+      await cancelPayPalSubscription(subscriptionId, "Customer requested cancellation");
     },
 
     async getSubscription(subscriptionId) {
-      const accessToken = await getPayPalAccessToken();
-
-      const response = await fetch(`${payPalBaseUrl()}/v1/billing/subscriptions/${subscriptionId}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      if (!response.ok) throw new Error("Failed to get PayPal subscription");
-
-      const data = await response.json();
+      const { getPayPalSubscription } = await import("@/lib/paypal");
+      const data = await getPayPalSubscription(subscriptionId);
+      const status = ["active", "trialing", "past_due", "canceled"].includes(data.status)
+        ? (data.status as Subscription["status"])
+        : "past_due";
       return {
         id: data.id,
-        status: data.status?.toLowerCase(),
-        currentPeriodStart: data.billing_info?.next_billing_time,
-        currentPeriodEnd: data.billing_info?.next_billing_time,
-        cancelAtPeriodEnd: false,
+        status,
+        currentPeriodStart: data.nextBillingTime ?? undefined,
+        currentPeriodEnd: data.nextBillingTime ?? undefined,
+        cancelAtPeriodEnd: data.cancelAtPeriodEnd,
       };
     },
 
-    verifyWebhookSignature(payload, signature) {
-      // PayPal webhook verification requires API call
-      // Simplified - production should verify via PayPal API
-      const paypalWebhookId = process.env.PAYPAL_WEBHOOK_ID;
-      if (!paypalWebhookId) return false;
-
-      // In production, verify with PayPal's verify-webhook-signature API
-      return signature.length > 0;
+    verifyWebhookSignature() {
+      // PayPal webhook verification is a server-side postback to PayPal's
+      // verify-webhook-signature API and is implemented in @/lib/paypal
+      // (verifyPayPalWebhook), used by the /api/webhooks/paypal route.
+      return false;
     },
 
     parseWebhookEvent(payload: Record<string, unknown>) {
       const eventType = payload.event_type as string;
+      const lifecycle = classifyPayPalEvent(eventType);
+      if (lifecycle === "unsupported") return null;
 
-      const eventMap: Record<string, WebhookEvent["type"]> = {
-        "BILLING.SUBSCRIPTION.CREATED": "subscription.created",
-        "BILLING.SUBSCRIPTION.UPDATED": "subscription.updated",
-        "BILLING.SUBSCRIPTION.CANCELLED": "subscription.canceled",
-        "BILLING.SUBSCRIPTION.EXPIRED": "subscription.canceled",
-        "BILLING.SUBSCRIPTION.SUSPENDED": "subscription.updated",
-        "PAYMENT.SALE.COMPLETED": "invoice.paid",
-        "BILLING.SUBSCRIPTION.PAYMENT.FAILED": "invoice.payment_failed",
+      const resource = (payload.resource ?? {}) as Record<string, unknown>;
+      const eventMap: Partial<Record<string, WebhookEvent["type"]>> = {
+        activated: "subscription.created",
+        reactivated: "subscription.updated",
+        created: "subscription.created",
+        updated: "subscription.updated",
+        cancelled: "subscription.canceled",
+        expired: "subscription.canceled",
+        suspended: "subscription.past_due",
+        payment_failed: "invoice.payment_failed",
+        payment_completed: "invoice.paid",
       };
 
-      const mappedType = eventMap[eventType];
-      if (!mappedType) return null;
-
-      const resource = (payload.resource as Record<string, unknown>) ?? {};
+      const subscriptionId = extractSubscriptionId(payload);
+      const planId = resource.plan_id as string | undefined;
+      const plan = planId
+        ? (["starter", "business", "pro"] as const).find((p) => getPayPalPlanId(p) === planId)
+        : undefined;
 
       return {
-        type: mappedType,
-        workspaceId: (resource.custom_id as string) ?? "",
-        subscriptionId: resource.id as string,
-        plan: resource.plan_id as PlanName | undefined,
-        amount: (resource.amount as Record<string, unknown>)?.total as number,
-        currency: (resource.amount as Record<string, unknown>)?.currency as string,
+        type: (eventMap[lifecycle] ?? "subscription.updated") as WebhookEvent["type"],
+        workspaceId: "",
+        subscriptionId,
+        plan,
+        amount: ((resource.amount ?? {}) as Record<string, unknown>)?.total as number | undefined,
+        currency: ((resource.amount ?? {}) as Record<string, unknown>)?.currency as string | undefined,
       };
     },
   };
@@ -567,11 +505,6 @@ function createLemonSqueezyProvider(): PaymentProviderAdapter {
 function getStripePriceId(plan: PlanName): string {
   const prefix = process.env.NODE_ENV === "production" ? "price_live_" : "price_test_";
   return `${prefix}${plan}`;
-}
-
-function getPayPalPrice(plan: PlanName): string {
-  const prices = { starter: "29.00", business: "79.00", pro: "149.00" };
-  return prices[plan];
 }
 
 function getLemonSqueezyVariantId(plan: PlanName): string {

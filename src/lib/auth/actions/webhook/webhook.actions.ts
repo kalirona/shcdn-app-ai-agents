@@ -7,9 +7,8 @@ import type { z } from "zod";
 import { requireWorkspaceAccess } from "@/lib/auth/access";
 import { PERMISSIONS } from "@/lib/auth/roles";
 import { createWebhookSchema, updateWebhookSchema, webhookIdSchema } from "@/lib/auth/schemas/webhook.schema";
-import type { WebhookEventName } from "@/lib/db/entities";
 import * as webhookRepo from "@/lib/db/repositories/webhook.repo";
-import { dispatchWebhook, generateWebhookSecret, sendTestWebhook } from "@/lib/webhooks/delivery";
+import { generateWebhookSecret, sendTestWebhook } from "@/lib/webhooks/delivery";
 
 export async function getWorkspaceWebhooks(workspaceId: string) {
   try {
@@ -187,16 +186,5 @@ export async function regenerateWebhookSecret(webhookId: string) {
     }
     console.error("Failed to regenerate secret:", error);
     return { error: "Failed to regenerate secret. Please try again." };
-  }
-}
-
-/** Public dispatch helper used by the data layer (lead/booking/conversation events). */
-export async function emitWebhookEvent(workspaceId: string, event: WebhookEventName, payload: Record<string, unknown>) {
-  try {
-    await dispatchWebhook(workspaceId, event, payload);
-    return { success: true };
-  } catch (error) {
-    console.error("Webhook dispatch failed:", error);
-    return { success: false };
   }
 }

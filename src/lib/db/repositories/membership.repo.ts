@@ -59,3 +59,13 @@ export async function findInviteByEmail(email: string): Promise<MembershipEntity
 export async function activateInvite(membershipId: string, userId: string): Promise<MembershipEntity> {
   return db.membership.update(membershipId, { user: userId, status: "active" });
 }
+
+export async function getAllMemberships(): Promise<MembershipEntity[]> {
+  return db.membership.getMany({
+    sort: ["-date_created"],
+  });
+}
+
+export async function getMembershipsByUser(userId: string): Promise<MembershipEntity[]> {
+  return db.membership.getByUser(userId);
+}

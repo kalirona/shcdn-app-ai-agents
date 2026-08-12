@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   type LucideIcon,
   MessageSquare,
+  Puzzle,
   Settings,
   Users,
 } from "lucide-react";
@@ -125,6 +126,12 @@ export const sidebarItems: NavGroup[] = [
     id: 5,
     label: "Settings",
     items: [
+      {
+        id: "integrations",
+        title: "Integrations",
+        url: "/dashboard/integrations",
+        icon: Puzzle,
+      },
       {
         id: "settings",
         title: "Settings",

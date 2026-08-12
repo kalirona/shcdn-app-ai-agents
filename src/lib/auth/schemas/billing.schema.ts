@@ -1,61 +1,3 @@
-import { z } from "zod";
-
-export const createSubscriptionSchema = z.object({
-  plan: z.enum(["starter", "business", "pro"]),
-  paymentProvider: z.enum(["stripe", "paypal", "lemon_squeezy"]),
-});
-
-export const cancelSubscriptionSchema = z.object({
-  workspaceId: z.string().min(1),
-  reason: z.string().max(500).optional(),
-});
-
-export const changePlanSchema = z.object({
-  workspaceId: z.string().min(1),
-  newPlan: z.enum(["starter", "business", "pro"]),
-});
-
-export const recordUsageSchema = z.object({
-  workspaceId: z.string().min(1),
-  metric: z.enum([
-    "ai_messages",
-    "ai_tokens",
-    "conversations",
-    "agents",
-    "knowledge_storage",
-    "documents",
-    "team_members",
-    "bookings",
-  ] as [string, ...string[]]),
-  amount: z.number().min(1),
-});
-
-export const usageLimitCheckSchema = z.object({
-  workspaceId: z.string().min(1),
-  metric: z.enum([
-    "ai_messages",
-    "ai_tokens",
-    "conversations",
-    "agents",
-    "knowledge_storage",
-    "documents",
-    "team_members",
-    "bookings",
-  ]),
-});
-
-export const webhookEventSchema = z.object({
-  provider: z.enum(["stripe", "paypal", "lemon_squeezy"]),
-  eventType: z.string().min(1),
-  payload: z.record(z.string(), z.unknown()),
-});
-
-export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>;
-export type CancelSubscriptionInput = z.infer<typeof cancelSubscriptionSchema>;
-export type ChangePlanInput = z.infer<typeof changePlanSchema>;
-export type RecordUsageInput = z.infer<typeof recordUsageSchema>;
-export type WebhookEventInput = z.infer<typeof webhookEventSchema>;
-
 export const PLAN_LIMITS = {
   starter: {
     ai_messages: 1000,
@@ -95,6 +37,26 @@ export const PLAN_PRICES = {
   pro: { monthly: 149, yearly: 1490 },
 } as const;
 
+/** Paid plan keys only (used by PLAN_LIMITS / PLAN_PRICES). */
 export type PlanName = keyof typeof PLAN_LIMITS;
+
+/** All selectable tiers shown in the plans grid, including the free tier. */
+export type PlanTier = PlanName | "free";
+
+export const PLAN_ORDER: PlanTier[] = ["free", "starter", "business", "pro"];
+
+export const PLAN_DISPLAY: Record<PlanTier, string> = {
+  free: "Free",
+  starter: "Starter",
+  business: "Business",
+  pro: "Pro",
+};
+
+export const PLAN_TAGLINES: Record<PlanTier, string> = {
+  free: "Explore Agent AI at no cost.",
+  starter: "For solo businesses getting started.",
+  business: "For growing teams that want real scale.",
+  pro: "For high-volume operations.",
+};
 
 export type UsageMetric = keyof typeof PLAN_LIMITS.starter;

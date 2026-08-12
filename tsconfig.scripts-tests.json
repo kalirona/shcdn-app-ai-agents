@@ -4,7 +4,11 @@
     "module": "node18",
     "moduleResolution": "node16",
     "target": "es2022",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["scripts/**/*.ts"]
 }

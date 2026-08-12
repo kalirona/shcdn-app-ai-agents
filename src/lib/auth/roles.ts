@@ -18,6 +18,13 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   [ROLES.MEMBER]: "View conversations, take over chats, and see relevant customer information",
 };
 
+// Platform-level role (separate from workspace roles)
+export const PLATFORM_ROLES = {
+  SUPER_ADMIN: "super_admin",
+} as const;
+
+export type PlatformRole = (typeof PLATFORM_ROLES)[keyof typeof PLATFORM_ROLES];
+
 export const PERMISSIONS = {
   AGENTS_CREATE: "agents:create",
   AGENTS_READ: "agents:read",
@@ -52,6 +59,19 @@ export const PERMISSIONS = {
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
+export const PLATFORM_PERMISSIONS = {
+  PLATFORM_USERS_READ: "platform:users:read",
+  PLATFORM_USERS_MANAGE: "platform:users:manage",
+  PLATFORM_WORKSPACES_READ: "platform:workspaces:read",
+  PLATFORM_WORKSPACES_MANAGE: "platform:workspaces:manage",
+  PLATFORM_BILLING_READ: "platform:billing:read",
+  PLATFORM_BILLING_MANAGE: "platform:billing:manage",
+  PLATFORM_AUDIT_READ: "platform:audit:read",
+  PLATFORM_SETTINGS_MANAGE: "platform:settings:manage",
+} as const;
+
+export type PlatformPermission = (typeof PLATFORM_PERMISSIONS)[keyof typeof PLATFORM_PERMISSIONS];
+
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [ROLES.OWNER]: Object.values(PERMISSIONS),
 
@@ -84,8 +104,16 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 };
 
+export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, PlatformPermission[]> = {
+  [PLATFORM_ROLES.SUPER_ADMIN]: Object.values(PLATFORM_PERMISSIONS),
+};
+
 export function hasPermission(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
+}
+
+export function hasPlatformPermission(role: PlatformRole, permission: PlatformPermission): boolean {
+  return PLATFORM_ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
 }
 
 export function canInvite(role: Role): boolean {

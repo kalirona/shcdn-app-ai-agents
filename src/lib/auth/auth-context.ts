@@ -1,5 +1,7 @@
 import { getLogtoContext } from "@logto/next/server-actions";
 
+import { isSuperAdmin as checkIsSuperAdmin } from "@/lib/db/repositories/platform-role.repo";
+
 import { logtoConfig } from "./logto-config";
 import type { User } from "./types";
 
@@ -26,12 +28,15 @@ function getDevUser(): User | null {
 export async function getAuthContext(): Promise<{
   isAuthenticated: boolean;
   user: User | null;
+  isSuperAdmin: boolean;
 }> {
   const devUser = getDevUser();
   if (devUser) {
+    const isSuperAdmin = await checkIsSuperAdmin(devUser.id).catch(() => false);
     return {
       isAuthenticated: true,
       user: devUser,
+      isSuperAdmin,
     };
   }
 
@@ -57,6 +62,11 @@ export async function getAuthContext(): Promise<{
       }),
     );
 
+    let isSuperAdmin = false;
+    if (context.isAuthenticated && context.claims?.sub) {
+      isSuperAdmin = await checkIsSuperAdmin(context.claims.sub).catch(() => false);
+    }
+
     return {
       isAuthenticated: context.isAuthenticated,
       user: context.claims
@@ -67,6 +77,7 @@ export async function getAuthContext(): Promise<{
             avatar: context.claims.picture ?? null,
           }
         : null,
+      isSuperAdmin,
     };
   } catch (error) {
     // TEMP DIAGNOSTIC: log the failure too.
@@ -74,6 +85,7 @@ export async function getAuthContext(): Promise<{
     return {
       isAuthenticated: false,
       user: null,
+      isSuperAdmin: false,
     };
   }
 }
