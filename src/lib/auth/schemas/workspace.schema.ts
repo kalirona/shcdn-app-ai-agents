@@ -50,6 +50,10 @@ export const removeMemberSchema = z.object({
   membershipId: z.string().min(1, "Membership ID is required."),
 });
 
+export const resendInvitationSchema = z.object({
+  membershipId: z.string().min(1, "Membership ID is required."),
+});
+
 export const updateMemberRoleSchema = z.object({
   membershipId: z.string().min(1, "Membership ID is required."),
   role: z.enum(["admin", "member"], {

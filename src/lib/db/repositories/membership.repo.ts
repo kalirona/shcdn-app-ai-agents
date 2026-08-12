@@ -38,6 +38,11 @@ export async function updateMemberRole(membershipId: string, role: "admin" | "me
   return db.membership.update(membershipId, { role });
 }
 
+/** Re-stamps a pending invite so it can be re-sent. Only valid for invited memberships. */
+export async function resendWorkspaceInvite(membershipId: string): Promise<MembershipEntity> {
+  return db.membership.update(membershipId, { status: "invited" });
+}
+
 export async function getUserRole(workspaceId: string, userId: string): Promise<string | null> {
   const memberships = await db.membership.getByWorkspace(workspaceId);
   const membership = memberships.find((m) => m.user === userId);

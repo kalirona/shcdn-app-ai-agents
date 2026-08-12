@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Loader2, Mail, Shield, User, UserMinus, UserPlus } from "lucide-react";
+import { Loader2, Mail, RefreshCcw, Shield, User, UserMinus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -23,6 +23,7 @@ import {
   getWorkspaceMembers,
   inviteMember,
   removeMember,
+  resendInvitation,
   updateMemberRole,
 } from "@/lib/auth/actions/workspace.actions";
 import { hasPermission, PERMISSIONS, ROLES, type Role } from "@/lib/auth/roles";
@@ -170,6 +171,16 @@ export function RoleManagement() {
     toast.success("Member removed from workspace");
   }
 
+  async function handleResendInvitation(memberId: string) {
+    if (!workspaceId) return;
+    const result = await resendInvitation(workspaceId, { membershipId: memberId });
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Invitation resent");
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -187,10 +198,8 @@ export function RoleManagement() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-medium">Team Members</h3>
-          <p className="text-muted-foreground text-sm">
-            Manage who has access to this workspace. Owners and Managers can invite members.
-          </p>
+          <h3 className="font-medium">Members &amp; Roles</h3>
+          <p className="text-muted-foreground text-sm">Manage who can access this workspace.</p>
         </div>
         {canInvite && (
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
@@ -265,10 +274,10 @@ export function RoleManagement() {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/50">
-                <th className="px-4 py-3 text-left font-medium text-sm">Member</th>
+                <th className="px-4 py-3 text-left font-medium text-sm">Name</th>
+                <th className="px-4 py-3 text-left font-medium text-sm">Email</th>
                 <th className="px-4 py-3 text-left font-medium text-sm">Role</th>
                 <th className="px-4 py-3 text-left font-medium text-sm">Status</th>
-                <th className="px-4 py-3 text-left font-medium text-sm">Joined</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -287,9 +296,11 @@ export function RoleManagement() {
                             {displayName}
                             {member.isSelf && <span className="ml-2 text-muted-foreground text-xs">(you)</span>}
                           </p>
-                          <p className="text-muted-foreground text-xs">{member.email ?? "Awaiting activation"}</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-muted-foreground text-sm">{member.email ?? "Awaiting activation"}</p>
                     </td>
                     <td className="px-4 py-3">
                       {canChangeRole && !member.isSelf && member.role !== ROLES.OWNER ? (
@@ -324,20 +335,30 @@ export function RoleManagement() {
                         {member.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground text-sm">
-                      {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : "—"}
-                    </td>
                     <td className="px-4 py-3 text-right">
-                      {canRemove && !member.isSelf && member.role !== ROLES.OWNER && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveMember(member.id)}
-                          title="Remove member"
-                        >
-                          <UserMinus className="size-4" />
-                        </Button>
-                      )}
+                      <div className="flex items-center justify-end gap-1">
+                        {canInvite && member.status === "invited" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleResendInvitation(member.id)}
+                            title="Resend invitation"
+                          >
+                            <RefreshCcw className="size-4" />
+                            Resend
+                          </Button>
+                        )}
+                        {canRemove && !member.isSelf && member.role !== ROLES.OWNER && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveMember(member.id)}
+                            title="Remove member"
+                          >
+                            <UserMinus className="size-4" />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

@@ -10,6 +10,7 @@ import {
   createWorkspaceSchema,
   inviteMemberSchema,
   removeMemberSchema,
+  resendInvitationSchema,
   updateMemberRoleSchema,
   updateWorkspaceSchema,
 } from "@/lib/auth/schemas/workspace.schema";
@@ -184,6 +185,36 @@ export async function updateMemberRole(workspaceId: string, data: z.infer<typeof
     }
     console.error("Failed to update member role:", error);
     return { error: "Failed to update member role. Please try again." };
+  }
+}
+
+export async function resendInvitation(workspaceId: string, data: z.infer<typeof resendInvitationSchema>) {
+  const parsed = resendInvitationSchema.safeParse(data);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+
+  try {
+    await requireWorkspaceAccess(workspaceId, PERMISSIONS.MEMBERS_INVITE);
+
+    const membership = await membershipRepo.getMembershipById(parsed.data.membershipId);
+    if (!membership) {
+      return { error: "Membership not found." };
+    }
+    if (membership.status !== "invited") {
+      return { error: "This member has already accepted their invitation." };
+    }
+
+    await membershipRepo.resendWorkspaceInvite(parsed.data.membershipId);
+    revalidatePath("/dashboard/settings");
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.startsWith("Unauthorized") || message.startsWith("Forbidden")) {
+      return { error: message };
+    }
+    console.error("Failed to resend invitation:", error);
+    return { error: "Failed to resend invitation. Please try again." };
   }
 }
 
