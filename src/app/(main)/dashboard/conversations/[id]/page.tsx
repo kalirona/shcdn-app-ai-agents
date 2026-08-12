@@ -29,6 +29,7 @@ export default function ConversationDetailPage({ params }: { params: { id: strin
   const [messages, setMessages] = useState<MessageEntity[]>([]);
   const [reply, setReply] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isTakingOver, setIsTakingOver] = useState(false);
 
@@ -39,6 +40,8 @@ export default function ConversationDetailPage({ params }: { params: { id: strin
       if (result.conversation) {
         setConversation(result.conversation);
         setMessages(result.messages);
+      } else if (result.error) {
+        setError(result.error);
       }
       setIsLoading(false);
     };
@@ -98,6 +101,18 @@ export default function ConversationDetailPage({ params }: { params: { id: strin
       toast.success("Conversation resolved.");
       setConversation((prev) => (prev ? { ...prev, status: "resolved" } : null));
     }
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <AlertCircle className="size-12 text-muted-foreground" />
+        <p className="mt-4 font-medium">{error}</p>
+        <Link href="/dashboard/conversations" className="mt-2 text-primary text-sm hover:underline">
+          Back to conversations
+        </Link>
+      </div>
+    );
   }
 
   if (isLoading) {

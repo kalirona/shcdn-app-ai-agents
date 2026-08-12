@@ -29,6 +29,7 @@ export default function OverviewPage() {
   const params = useParams();
   const agentId = params.id as string;
   const [agent, setAgent] = useState<AgentEntity | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -43,6 +44,11 @@ export default function OverviewPage() {
           if (!cancelled) setIsLoading(false);
           return;
         }
+        if (result.error) {
+          if (!cancelled) setError(result.error);
+          if (!cancelled) setIsLoading(false);
+          return;
+        }
       } catch {
         // fall through
       }
@@ -54,6 +60,14 @@ export default function OverviewPage() {
       cancelled = true;
     };
   }, [agentId]);
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
 
   async function toggleStatus() {
     if (!agent) return;

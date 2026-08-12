@@ -179,6 +179,10 @@ export async function getAgentById(agentId: string) {
     }
     return { success: true, agent };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.startsWith("Unauthorized") || message.startsWith("Forbidden")) {
+      return { error: message, agent: null };
+    }
     console.error("Failed to fetch agent:", error);
     return { error: "Failed to load agent.", agent: null };
   }

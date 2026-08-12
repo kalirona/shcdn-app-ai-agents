@@ -34,6 +34,7 @@ export default function SettingsPage() {
   const [agent, setAgent] = useState<AgentEntity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +45,11 @@ export default function SettingsPage() {
         if (result.success && result.agent) {
           saveAgentToStorage(result.agent as AgentEntity);
           if (!cancelled) setAgent(result.agent as AgentEntity);
+          if (!cancelled) setIsLoading(false);
+          return;
+        }
+        if (result.error) {
+          if (!cancelled) setError(result.error);
           if (!cancelled) setIsLoading(false);
           return;
         }
@@ -88,6 +94,14 @@ export default function SettingsPage() {
       toast.error("Failed to delete agent.");
       setIsDeleting(false);
     }
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-muted-foreground">{error}</p>
+      </div>
+    );
   }
 
   if (isLoading) {

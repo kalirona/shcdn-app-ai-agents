@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { useParams } from "next/navigation";
+
 import { Bot, Calendar, CheckCircle, MessageSquare, TrendingUp, Users, XCircle } from "lucide-react";
 
+import { getAgentById } from "@/lib/auth/actions/agent.actions";
 import type { AgentEntity } from "@/lib/db/entities";
 import { getAgentFromStorage } from "@/lib/db/storage-helper";
 
@@ -17,9 +20,7 @@ function KPICard({ label, value, icon }: KPICardProps) {
   return (
     <div className="rounded-lg border bg-background p-4">
       <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-          {icon}
-        </div>
+        <div className="flex size-10 items-center justify-center rounded-lg bg-muted">{icon}</div>
         <div>
           <p className="text-muted-foreground text-sm">{label}</p>
           <p className="font-semibold text-2xl">{value}</p>
@@ -33,18 +34,41 @@ export default function AgentAnalyticsPage() {
   const params = useParams();
   const agentId = params.id as string;
   const [agent, setAgent] = useState<AgentEntity | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const found = getAgentFromStorage(agentId);
-    if (found) setAgent(found);
-    setIsLoading(false);
+    let cancelled = false;
+    const load = async () => {
+      const local = getAgentFromStorage(agentId);
+      try {
+        const result = await getAgentById(agentId);
+        if (result.success && result.agent) {
+          if (!cancelled) setAgent(result.agent as AgentEntity);
+          if (!cancelled) setIsLoading(false);
+          return;
+        }
+        if (result.error) {
+          if (!cancelled) setError(result.error);
+          if (!cancelled) setIsLoading(false);
+          return;
+        }
+      } catch {
+        // fall through
+      }
+      if (!cancelled) setAgent(local);
+      if (!cancelled) setIsLoading(false);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [agentId]);
 
-  if (isLoading) {
+  if (error) {
     return (
       <div className="flex items-center justify-center py-16">
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground">{error}</p>
       </div>
     );
   }
