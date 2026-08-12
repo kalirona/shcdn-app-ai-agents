@@ -41,6 +41,22 @@ export async function getAuthContext(): Promise<{
       fetchUserInfo: true,
     });
 
+    // TEMP DIAGNOSTIC: log the identity Logto actually returned so we can
+    // confirm whether the dashboard is showing the real registered user.
+    // TODO: remove after confirming the identity bug is resolved.
+    console.log(
+      "[auth-context] resolved =",
+      JSON.stringify({
+        env: process.env.NODE_ENV,
+        isAuthenticated: context.isAuthenticated,
+        sub: context.claims?.sub ?? null,
+        email: context.claims?.email ?? null,
+        name: context.claims?.name ?? null,
+        picture: context.claims?.picture ?? null,
+        allClaims: context.claims ? Object.keys(context.claims) : null,
+      }),
+    );
+
     return {
       isAuthenticated: context.isAuthenticated,
       user: context.claims
@@ -52,7 +68,9 @@ export async function getAuthContext(): Promise<{
           }
         : null,
     };
-  } catch {
+  } catch (error) {
+    // TEMP DIAGNOSTIC: log the failure too.
+    console.error("[auth-context] ERROR resolving identity:", error);
     return {
       isAuthenticated: false,
       user: null,
