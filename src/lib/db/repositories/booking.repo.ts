@@ -1,3 +1,5 @@
+import { dispatchWebhook } from "@/lib/webhooks/delivery";
+
 import { db } from "../client";
 import type { BookingEntity } from "../entities";
 
@@ -14,7 +16,7 @@ export interface CreateBookingParams {
 }
 
 export async function createBooking(params: CreateBookingParams): Promise<BookingEntity> {
-  return db.booking.create({
+  const booking = await db.booking.create({
     workspace: params.workspace,
     service: params.service ?? null,
     date: params.date ?? null,
@@ -25,6 +27,9 @@ export async function createBooking(params: CreateBookingParams): Promise<Bookin
     notes: params.notes ?? null,
     status: params.status ?? "confirmed",
   });
+
+  await dispatchWebhook(params.workspace, "booking.created", { booking });
+  return booking;
 }
 
 export async function getWorkspaceBookings(workspaceId: string): Promise<BookingEntity[]> {
@@ -40,9 +45,17 @@ export async function getBookingById(id: string): Promise<BookingEntity | null> 
 }
 
 export async function updateBookingStatus(id: string, status: BookingEntity["status"]): Promise<BookingEntity> {
-  return db.booking.update(id, { status });
+  const booking = await db.booking.update(id, { status });
+  if (status === "cancelled") {
+    await dispatchWebhook(booking.workspace, "booking.cancelled", { booking });
+  } else if (status === "rescheduled") {
+    await dispatchWebhook(booking.workspace, "booking.rescheduled", { booking });
+  }
+  return booking;
 }
 
 export async function cancelBooking(id: string): Promise<BookingEntity> {
-  return db.booking.update(id, { status: "cancelled" });
+  const booking = await db.booking.update(id, { status: "cancelled" });
+  await dispatchWebhook(booking.workspace, "booking.cancelled", { booking });
+  return booking;
 }

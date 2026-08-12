@@ -9,7 +9,7 @@ export function BillingTab() {
           <p className="text-muted-foreground text-sm">Your workspace billing status.</p>
         </div>
         <a href="/dashboard/settings/billing" className="text-primary text-sm hover:underline">
-          Manage billing →
+          Open billing →
         </a>
       </div>
       <div className="rounded-lg border bg-background p-6">
@@ -17,7 +17,9 @@ export function BillingTab() {
           You&apos;re currently on the <strong>free trial</strong>.
         </p>
         <a
-          href={`mailto:sales@${new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://example.com").hostname}?subject=${encodeURIComponent("Upgrade to a paid plan")}`}
+          href={`mailto:sales@${
+            new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://example.com").hostname
+          }?subject=${encodeURIComponent("Upgrade to a paid plan")}`}
           className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-primary-foreground text-sm"
         >
           Contact us to upgrade

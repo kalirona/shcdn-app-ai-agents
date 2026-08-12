@@ -1,3 +1,5 @@
+import { dispatchWebhook } from "@/lib/webhooks/delivery";
+
 import { db } from "../client";
 import type { LeadEntity } from "../entities";
 
@@ -14,7 +16,7 @@ export interface CreateLeadParams {
 }
 
 export async function createLead(params: CreateLeadParams): Promise<LeadEntity> {
-  return db.lead.create({
+  const lead = await db.lead.create({
     workspace: params.workspace,
     name: params.name,
     email: params.email,
@@ -25,6 +27,9 @@ export async function createLead(params: CreateLeadParams): Promise<LeadEntity> 
     status: params.status ?? "new",
     qualification: params.qualification ?? {},
   });
+
+  await dispatchWebhook(params.workspace, "lead.created", { lead });
+  return lead;
 }
 
 export async function getWorkspaceLeads(workspaceId: string): Promise<LeadEntity[]> {

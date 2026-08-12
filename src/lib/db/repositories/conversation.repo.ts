@@ -1,3 +1,5 @@
+import { dispatchWebhook } from "@/lib/webhooks/delivery";
+
 import { db } from "../client";
 import type { ConversationEntity, MessageEntity } from "../entities";
 
@@ -10,7 +12,7 @@ export interface CreateConversationParams {
 }
 
 export async function createConversation(params: CreateConversationParams): Promise<ConversationEntity> {
-  return db.conversation.create({
+  const conversation = await db.conversation.create({
     workspace: params.workspace,
     agent: params.agent,
     customer: params.customer ?? null,
@@ -19,6 +21,9 @@ export async function createConversation(params: CreateConversationParams): Prom
     handoff_trigger: null,
     handoff_reason: null,
   });
+
+  await dispatchWebhook(params.workspace, "conversation.created", { conversation });
+  return conversation;
 }
 
 export async function getWorkspaceConversations(workspaceId: string): Promise<ConversationEntity[]> {
@@ -43,11 +48,16 @@ export async function updateConversationStatus(
   handoffTrigger?: string,
   handoffReason?: string,
 ): Promise<ConversationEntity> {
-  return db.conversation.update(id, {
+  const conversation = await db.conversation.update(id, {
     status,
     handoff_trigger: handoffTrigger ?? null,
     handoff_reason: handoffReason ?? null,
   });
+
+  if (status === "with_human" || status === "human_required") {
+    await dispatchWebhook(conversation.workspace, "conversation.handoff", { conversation });
+  }
+  return conversation;
 }
 
 export async function deleteConversation(id: string): Promise<void> {

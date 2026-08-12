@@ -8,6 +8,8 @@ import type {
   LeadEntity,
   MembershipEntity,
   MessageEntity,
+  WebhookDeliveryEntity,
+  WebhookEntity,
   WorkspaceEntity,
 } from "./entities";
 
@@ -63,7 +65,12 @@ async function request<T>(path: string, options: RequestInit = {}, query?: Direc
     throw new Error(`Directus error [${response.status}]: ${errorBody}`);
   }
 
-  const data: DirectusResponse<T> = await response.json();
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  const data: DirectusResponse<T> = text ? JSON.parse(text) : (undefined as T);
   return data.data;
 }
 
@@ -400,5 +407,55 @@ export const db = {
       }),
 
     delete: (id: string) => request<void>(`/customers/${id}`, { method: "DELETE" }),
+  },
+
+  webhook: {
+    create: (data: Omit<WebhookEntity, "id" | "date_created" | "date_updated" | "active"> & { active?: boolean }) =>
+      request<WebhookEntity>("/webhooks", {
+        method: "POST",
+        body: JSON.stringify({ ...data, active: data.active ?? true }),
+      }),
+
+    getById: (id: string) => request<WebhookEntity>(`/webhooks/${id}`),
+
+    getMany: (query?: DirectusQuery) => request<WebhookEntity[]>("/webhooks", {}, query),
+
+    getByWorkspace: (workspaceId: string) =>
+      request<WebhookEntity[]>(
+        "/webhooks",
+        {},
+        {
+          filter: { workspace: { _eq: workspaceId } },
+          sort: ["-date_created"],
+        },
+      ),
+
+    update: (id: string, data: Partial<WebhookEntity>) =>
+      request<WebhookEntity>(`/webhooks/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    delete: (id: string) => request<void>(`/webhooks/${id}`, { method: "DELETE" }),
+  },
+
+  webhookDelivery: {
+    create: (data: Omit<WebhookDeliveryEntity, "id" | "date_created" | "date_updated">) =>
+      request<WebhookDeliveryEntity>("/webhook_deliveries", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    getByWebhook: (webhookId: string) =>
+      request<WebhookDeliveryEntity[]>(
+        "/webhook_deliveries",
+        {},
+        {
+          filter: { webhook: { _eq: webhookId } },
+          sort: ["-date_created"],
+        },
+      ),
+
+    getMany: (query?: DirectusQuery) => request<WebhookDeliveryEntity[]>("/webhook_deliveries", {}, query),
   },
 };

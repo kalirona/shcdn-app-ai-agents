@@ -170,3 +170,35 @@ export interface StaffEntity {
   working_hours: Record<string, { start: string; end: string }>;
   status: "active" | "inactive";
 }
+
+export type WebhookEventName =
+  | "conversation.created"
+  | "conversation.handoff"
+  | "lead.created"
+  | "booking.created"
+  | "booking.cancelled"
+  | "booking.rescheduled";
+
+export interface WebhookEntity {
+  id: string;
+  workspace: string;
+  name: string;
+  endpoint_url: string;
+  events: WebhookEventName[];
+  secret: string | null;
+  active: boolean | null;
+  date_created: string;
+  date_updated: string;
+}
+
+export interface WebhookDeliveryEntity {
+  id: string;
+  webhook: string;
+  event: string;
+  status: "success" | "failed";
+  http_status: number | null;
+  response_time: number | null;
+  retry_count: number | null;
+  date_created: string;
+  date_updated: string;
+}
