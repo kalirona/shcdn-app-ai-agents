@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_APP_URL
+        - NEXT_PUBLIC_SUPABASE_URL
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ports:
+      - "9000:9000"
+    environment:
+      - NODE_ENV=production
+      - PORT=9000
+      - HOSTNAME=0.0.0.0
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - AUTH_PROVIDER=${AUTH_PROVIDER}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - DIRECTUS_URL=${DIRECTUS_URL}
+      - DIRECTUS_TOKEN=${DIRECTUS_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - LEMON_SQUEEZY_API_KEY=${LEMON_SQUEEZY_API_KEY}
+      - LEMON_SQUEEZY_STORE_ID=${LEMON_SQUEEZY_STORE_ID}
+      - LEMON_SQUEEZY_WEBHOOK_SECRET=${LEMON_SQUEEZY_WEBHOOK_SECRET}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - ALLOWED_WIDGET_ORIGINS=${ALLOWED_WIDGET_ORIGINS}
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL}
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-web.rule=Host(`myapp.sitenexai.com`)
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-web.entrypoints=websecure
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-web.tls=true
+      - traefik.http.services.aiagentappshdcn-aiapp-hqg74c-web.loadbalancer.server.port=9000
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:9000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+networks:
+  default:
+    name: dokploy-network
+    external: true
