@@ -57,6 +57,7 @@ Verified in the running container: `docker compose exec web env` shows all four 
 ## D. Service-Role Key Security — TEST 14 ✅ PASS
 
 - Grep of `.next/static` and the entire `.next` build output for `[REDACTED-SUPABASE-SERVICE-ROLE-KEY]`: **0 matches** (not in client bundles).
+- **Live API response scan**: `grep` of the service-role key across actual HTTP responses of login, register, forgot-password, change-password, reset-password, dashboard, dashboard/agents, dashboard/analytics, `/admin`, `/api/auth/session`, and `/` → **all clean** (no key in any response body).
 - `admin.ts` is `server-only`; `requireSupabaseServiceRoleKey()` throws if ever reached from the browser.
 - Key is absent from all `NEXT_PUBLIC_*` env.
 
@@ -112,6 +113,13 @@ Centralized in `src/lib/auth/provider.ts`:
 
 - User B created (`isolation.user.1787116724@example.com`) → own workspace `Isolation Test User's Workspace` (id `fdbbf4f5-...`), membership role `owner`, own profile.
 - User B's `/dashboard` → 200 (served within B's own workspace); no cross-leak with user A's data (RLS-scoped reads).
+- **Explicit RLS denial (live, actual JWTs via PostgREST)**: created users A2 + B2 with separate workspaces + owner memberships (service-role, same as app provisioning), then queried cross-workspace with each user's own anon-key JWT:
+  - A2 reading B2's workspace → `[]` (denied)
+  - B2 reading A2's workspace → `[]` (denied)
+  - A2 reading B2's `workspace_members` → `[]` (denied)
+  - B2 reading A2's `workspace_members` → `[]` (denied)
+  - Baseline: each user sees exactly their own workspace.
+  All test data (users, workspaces, memberships) deleted afterwards — verified 0 rows remaining.
 
 ## N. Admin Authorization — TEST 10 ✅ PASS
 
@@ -126,7 +134,17 @@ Centralized in `src/lib/auth/provider.ts`:
 
 ## P. Forgot Password / Recovery — TEST 12 ✅ PASS
 
-- Admin `generate_link?type=recovery` → `GET /auth/v1/verify?token=...&type=recovery` → **307 → `/auth/v1/change-password?recovery=true`** with a fresh session. No SMTP needed.
+- Page `/auth/v1/forgot-password` → 200; form uses `supabaseForgotPasswordAction` → `resetSupabasePassword(email)` (GoTrue emails link to `/auth/v1/verify?type=recovery`; no account enumeration — same "sent" state for unknown addresses).
+- **`/auth/v1/reset-password` (added this phase)** — server component with a real session guard: calls `getCurrentSupabaseUser()`; without a valid Supabase recovery session it redirects to `/auth/v1/login?error=invalid_link`. With a session it renders the new-password form (recovery mode, no current-password field) which submits to `changePasswordAction` with `recovery=true`.
+- Full live flow verified:
+  1. Admin `generate_link?type=recovery&redirect_to=.../auth/v1/verify` → token.
+  2. `GET /auth/v1/verify?token=...&type=recovery` → **307 → `/auth/v1/reset-password`** + `set-cookie: sb-sup-auth-token=...` (session established via `verifySupabaseOtp`).
+  3. `/auth/v1/reset-password` with that cookie → **200**, form rendered (New password / Confirm / Reset).
+- Edge cases (Step 3.16):
+  - **Invalid recovery link** (fake token) → 307 → `login?error=invalid_link`.
+  - **Missing token** → 307 → `login?error=invalid_link`.
+  - **Expired/consumed link (no session)** → `/auth/v1/reset-password` → 307 → `login?error=invalid_link` (the server-side session guard covers this).
+- Password reset action (`changeSupabasePassword` recovery mode → `updateUser({password})`) verified previously; new password works, old rejected.
 
 ## Q. Verify Route (Step 3.7/3.8) ✅ PASS
 
@@ -177,22 +195,25 @@ With session: `/dashboard`, `/dashboard/agents|conversations|leads|crm|analytics
 | 5. Session refresh | ✅ PASS | 307 → `/api/auth/session` → `/dashboard`, cookie re-issued |
 | 6. Current user | ✅ PASS | `/api/auth/session` validated user |
 | 7. (n/a — covered by K/L) | — | — |
-| 8. Workspace isolation | ✅ PASS | 3 distinct workspaces; B isolated from A |
+| 8. Workspace isolation | ✅ PASS | 3 distinct workspaces; explicit RLS denial (A2/B2 cross-reads → `[]`) |
 | 9. Provisioning no-dup | ✅ PASS | 2 logins → 1 workspace / 1 membership / 1 profile |
 | 10. Admin 403 vs super-admin | ✅ PASS | B → login redirect; A → 200 |
 | 11. Password change | ✅ PASS | old rejected, new works, reverted |
-| 12. Forgot password | ✅ PASS | recovery link → change-password?recovery=true |
+| 12. Forgot password | ✅ PASS | recovery link → `/auth/v1/reset-password` (session-guarded); invalid/expired links → login?error=invalid_link |
 | 13. Unauthorized route | ✅ PASS | all protected routes redirect unauth |
-| 14. Service-role in bundle | ✅ PASS | 0 matches in `.next` |
+| 14. Service-role in bundle | ✅ PASS | 0 matches in `.next` + all live API responses clean |
 | 15. Directus rollback | ✅ PASS | flip to directus + back, both healthy |
 
 **Zero FAIL.** One known BLOCKED: real SMTP email delivery (see below).
 
-## Z. Build & Static Validation (Step 3.26)
-
 - `npx tsc --noEmit` → **clean** (`TSC_EXIT_CODE=0`).
-- `biome lint src/lib/auth src/lib/supabase` → clean of Phase 3 issues after removing an unused `PlatformRoleEntity` import (`supabase-identity.ts`). Remaining 2 errors are **pre-existing** in unrelated legacy files (`analytics.actions.ts`, `billing.actions.ts`, `agent-config.ts`).
-- `docker compose build` → **success** after fixing a duplicate-route conflict.
+- `biome lint src/lib/auth src/lib/supabase` → **clean, 0 errors** after fixes this session:
+  - removed unused `PlatformRoleEntity` import (`supabase-identity.ts`),
+  - removed unused `WorkspaceAnalyticsKPIs` import (`analytics.actions.ts`),
+  - typed `let access` (`billing.actions.ts`),
+  - replaced `forEach` returning a value with a for-loop (`agent-config.ts`).
+- Remaining repo-wide biome errors are **pre-existing and out of scope** (hard rules: do not touch Directus): `public/widget.js` (public embed widget), `scripts/directus-*.mjs` (Directus setup scripts), `scripts/functional-audit-billing-webhooks.ts` (billing audit). No `any`/`@ts-ignore`/`@ts-nocheck` suppressions used.
+- `docker compose build` → **success**.
 
 ### Build fix this session (critical)
 - Commit `fd3e5e4` had added the change-password page under `src/app/(main)/auth/v1/change-password/`, but a canonical page already existed under `src/app/(auth)/auth/v1/change-password/`. Turbopack failed: *"You cannot have two parallel pages that resolve to the same path."*
@@ -239,6 +260,8 @@ With session: `/dashboard`, `/dashboard/agents|conversations|leads|crm|analytics
 - `fd3e5e4` — change-password page (canonical `(auth)` version)
 - `f236c21` — fix: remove duplicate `(main)` change-password page that broke Turbopack build
 - `16a7887` — fix: remove unused `PlatformRoleEntity` import
+- `edad479` — feat: `/auth/v1/reset-password` page (recovery flow) with server-side session guard; redirect recovery links to it
+- `5360e5c` — fix: resolve remaining biome lint errors in `src/lib/auth`
 
 ## Test environment
 
