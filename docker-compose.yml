@@ -1,5 +1,4 @@
 version: "3.8"
-
 services:
   web:
     build:
@@ -10,7 +9,7 @@ services:
         - NEXT_PUBLIC_SUPABASE_URL
         - NEXT_PUBLIC_SUPABASE_ANON_KEY
     ports:
-      - "9000:9000"
+      - 9000:9000
     environment:
       - NODE_ENV=production
       - PORT=9000
@@ -40,19 +39,35 @@ services:
       - R2_PUBLIC_URL=${R2_PUBLIC_URL}
     restart: unless-stopped
     labels:
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-36-web.rule=Host(`myapp.sitenexai.com`)
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-36-web.entrypoints=web
+      - traefik.http.services.aiagentappshdcn-aiapp-hqg74c-36-web.loadbalancer.server.port=9000
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-36-web.service=aiagentappshdcn-aiapp-hqg74c-36-web
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-36-web.middlewares=redirect-to-https@file
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-36-websecure.rule=Host(`myapp.sitenexai.com`)
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-36-websecure.entrypoints=websecure
+      - traefik.http.services.aiagentappshdcn-aiapp-hqg74c-36-websecure.loadbalancer.server.port=9000
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-36-websecure.service=aiagentappshdcn-aiapp-hqg74c-36-websecure
+      - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-36-websecure.tls.certresolver=letsencrypt
       - traefik.enable=true
       - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-web.rule=Host(`myapp.sitenexai.com`)
       - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-web.entrypoints=websecure
       - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-web.tls=true
       - traefik.http.services.aiagentappshdcn-aiapp-hqg74c-web.loadbalancer.server.port=9000
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:9000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://localhost:9000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 15s
       timeout: 10s
       retries: 5
       start_period: 10s
-
+    networks:
+      - aiagentappshdcn-aiapp-hqg74c
 networks:
   default:
     name: dokploy-network
+    external: true
+  aiagentappshdcn-aiapp-hqg74c:
+    name: aiagentappshdcn-aiapp-hqg74c
     external: true
