@@ -10,7 +10,8 @@ import { verifySupabaseOtp } from "@/lib/supabase/auth";
  * On success a Supabase session is established (cookies are writable in a route
  * handler). The redirect destination depends on the flow type:
  *   - signup/invite/email_change  -> dashboard
- *   - recovery                     -> change-password (recovery mode)
+ *   - recovery                     -> reset-password (recovery mode; the page
+ *                                     re-verifies the established session)
  *
  * On failure the user is sent back to sign-in with a generic error (no
  * enumeration or leak).
@@ -31,9 +32,8 @@ export async function GET(request: NextRequest) {
     await verifySupabaseOtp(tokenHash, type);
 
     if (type === "recovery") {
-      const change = new URL("/auth/v1/change-password", origin);
-      change.searchParams.set("recovery", "true");
-      return NextResponse.redirect(change);
+      const reset = new URL("/auth/v1/reset-password", origin);
+      return NextResponse.redirect(reset);
     }
 
     return NextResponse.redirect(new URL("/dashboard", origin));
