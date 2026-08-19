@@ -90,7 +90,9 @@ export function getToolsForBehaviors(behaviors: AgentBehavior[]): Tool[] {
   const tools = new Set<Tool>();
   for (const behavior of behaviors) {
     const behaviorTools = BEHAVIOR_TOOLS[behavior] || [];
-    behaviorTools.forEach((tool) => tools.add(tool));
+    for (const tool of behaviorTools) {
+      tools.add(tool);
+    }
   }
   return Array.from(tools);
 }

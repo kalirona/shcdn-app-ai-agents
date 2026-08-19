@@ -48,7 +48,7 @@ export async function checkPayPalConnection(workspaceId: string) {
     return { error: "Unauthorized: You must be logged in." };
   }
 
-  let access;
+  let access: Awaited<ReturnType<typeof checkWorkspaceAccess>>;
   try {
     access = await checkWorkspaceAccess(current.user.id, workspaceId, PERMISSIONS.BILLING_MANAGE);
   } catch {

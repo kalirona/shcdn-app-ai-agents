@@ -7,7 +7,6 @@ import {
   getTopQuestions,
   getUnansweredQuestions,
   getWorkspaceAnalyticsKPIs,
-  type WorkspaceAnalyticsKPIs,
 } from "@/lib/db/repositories/analytics.repo";
 
 export interface AnalyticsKPIs {
