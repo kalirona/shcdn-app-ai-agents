@@ -1,3 +1,7 @@
+import { isSupabase } from "@/lib/auth/provider";
+
+import { supabaseDb } from "./supabase-client";
+
 import type {
   AgentEntity,
   AIDefaultsEntity,
@@ -132,7 +136,12 @@ async function requestUsers<T>(path: string, options: RequestInit = {}, query?: 
   return data.data;
 }
 
-export const db = {
+/**
+ * Directus HTTP client (legacy). Kept intact as the Directus-backed data path.
+ * When AUTH_PROVIDER=supabase the exported `db` below dispatches to the
+ * Supabase-backed mirror instead. See supabase-client.ts.
+ */
+export const directusDb = {
   workspace: {
     create: (
       data: Omit<
@@ -791,3 +800,14 @@ export const db = {
     },
   },
 };
+
+/**
+ * Active data-access client.
+ *
+ * With AUTH_PROVIDER=supabase this is the Supabase-backed mirror of the
+ * Directus client (same method surface, entity shapes preserved). With
+ * AUTH_PROVIDER=directus it is the legacy Directus HTTP client. All 21
+ * repositories import `db` from this module and therefore work under either
+ * provider without modification.
+ */
+export const db = isSupabase() ? supabaseDb : directusDb;
