@@ -1,6 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { MembershipEntity, PlatformRoleEntity } from "@/lib/db/entities";
+import type { MembershipEntity } from "@/lib/db/entities";
 
 /**
  * Supabase identity resolution (server-only).
