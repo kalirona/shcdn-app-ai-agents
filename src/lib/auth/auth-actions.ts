@@ -4,16 +4,21 @@ import { redirect } from "next/navigation";
 
 import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
 import { getPlatformSettings } from "@/lib/db/repositories/platform-settings.repo";
+import {
+  getCurrentSupabaseUser,
+  loginWithSupabase,
+  signOutFromSupabase,
+  signUpWithSupabase,
+} from "@/lib/supabase/auth";
 
 import { directusCreateUser, getCurrentDirectusUser, loginWithDirectus, signOutFromDirectus } from "./directus-auth";
 import { isSupabase } from "./provider";
 import {
-  loginWithSupabase,
-  getCurrentSupabaseUser,
-  signOutFromSupabase,
-  signUpWithSupabase,
-} from "@/lib/supabase/auth";
-import { directusLoginSchema, directusSignUpSchema, supabaseLoginSchema, supabaseSignUpSchema } from "./schemas/auth.schema";
+  directusLoginSchema,
+  directusSignUpSchema,
+  supabaseLoginSchema,
+  supabaseSignUpSchema,
+} from "./schemas/auth.schema";
 
 export async function signInAction() {
   redirect("/auth/v1/login");
@@ -179,7 +184,9 @@ export async function supabaseSignInAction(
         targetLabel: parsed.data.email,
         metadata: { reason: "email_not_confirmed" },
       });
-      return { error: "Please confirm your email address before signing in. Check your inbox for the confirmation link." };
+      return {
+        error: "Please confirm your email address before signing in. Check your inbox for the confirmation link.",
+      };
     }
     console.error("Supabase sign-in failed:", error);
     await logAudit({
