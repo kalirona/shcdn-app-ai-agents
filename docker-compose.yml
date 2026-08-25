@@ -20,10 +20,6 @@ services:
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - AUTH_PROVIDER=${AUTH_PROVIDER}
-    # Provider-secret encryption key lives outside the Dokploy-managed .env
-    # (which gets regenerated) in a root-only env file.
-    env_file:
-      - /etc/dokploy/secrets/aiapp.env
       - SESSION_SECRET=${SESSION_SECRET}
       - DIRECTUS_URL=${DIRECTUS_URL}
       - DIRECTUS_TOKEN=${DIRECTUS_TOKEN}
@@ -39,9 +35,12 @@ services:
       - ALLOWED_WIDGET_ORIGINS=${ALLOWED_WIDGET_ORIGINS}
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
-      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
       - R2_BUCKET_NAME=${R2_BUCKET_NAME}
       - R2_PUBLIC_URL=${R2_PUBLIC_URL}
+    # Provider-secret encryption key lives outside the Dokploy-managed .env
+    # (which gets regenerated) in a root-only env file.
+    env_file:
+      - /etc/dokploy/secrets/aiapp.env
     restart: unless-stopped
     labels:
       - traefik.http.routers.aiagentappshdcn-aiapp-hqg74c-36-web.rule=Host(`myapp.sitenexai.com`)
