@@ -20,7 +20,10 @@ services:
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - AUTH_PROVIDER=${AUTH_PROVIDER}
-      - AI_API_KEY_ENCRYPTION_KEY=${AI_API_KEY_ENCRYPTION_KEY}
+    # Provider-secret encryption key lives outside the Dokploy-managed .env
+    # (which gets regenerated) in a root-only env file.
+    env_file:
+      - /etc/dokploy/secrets/aiapp.env
       - SESSION_SECRET=${SESSION_SECRET}
       - DIRECTUS_URL=${DIRECTUS_URL}
       - DIRECTUS_TOKEN=${DIRECTUS_TOKEN}

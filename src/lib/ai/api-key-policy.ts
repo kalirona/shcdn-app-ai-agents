@@ -30,9 +30,10 @@ export function resolveApiKeyPatch(
   incoming: string | null | undefined,
   encrypt: (plaintext: string) => string,
 ): { apiKey?: string } {
-  if (incoming === undefined) return {};
-  if (isBlankSecret(incoming)) return {};
-  return { apiKey: encrypt(incoming.trim()) };
+  if (typeof incoming !== "string") return {};
+  const trimmed = incoming.trim();
+  if (trimmed.length === 0) return {};
+  return { apiKey: encrypt(trimmed) };
 }
 
 /**
