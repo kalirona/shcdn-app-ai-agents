@@ -19,10 +19,7 @@ const KNOWN_TYPES = new Set(["recovery", "signup", "invite", "email_change", "em
  * are handled client-side by supabase-verify-client via
  * supabase.auth.setSession() on the existing @supabase/ssr browser client.
  */
-export async function verifyEmailTokenAction(
-  token: string,
-  type: string,
-): Promise<VerifyEmailTokenResult> {
+export async function verifyEmailTokenAction(token: string, type: string): Promise<VerifyEmailTokenResult> {
   if (!isSupabase()) {
     return { ok: false };
   }

@@ -49,8 +49,7 @@ export function VerifyClient() {
       // bar, browser history entries created afterwards, or referrer headers.
       history.replaceState(null, "", window.location.pathname + window.location.search);
 
-      const error =
-        hash.get("error_description") ?? hash.get("error") ?? hash.get("error_code");
+      const error = hash.get("error_description") ?? hash.get("error") ?? hash.get("error_code");
       const accessToken = hash.get("access_token");
       const refreshToken = hash.get("refresh_token");
       const type = hash.get("type") ?? "";
