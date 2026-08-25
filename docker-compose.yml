@@ -9,6 +9,7 @@ services:
         - NEXT_PUBLIC_SUPABASE_URL
         - NEXT_PUBLIC_SUPABASE_ANON_KEY
         - AUTH_PROVIDER
+        - AUTH_PROVIDER
     ports:
       - 9000:9000
     environment:
