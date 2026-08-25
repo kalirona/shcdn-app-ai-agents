@@ -1,4 +1,5 @@
 import { decryptApiKey, encryptApiKey } from "@/lib/ai/crypto";
+import { assertCreatableSecret, resolveApiKeyPatch } from "@/lib/ai/api-key-policy";
 
 import { db } from "../client";
 import type { AICapability, AIProviderEntity, AIProviderKey, AIProviderType } from "../entities";
@@ -34,16 +35,22 @@ export function maskApiKey(key: string | null): { hasKey: boolean; hint: string 
 }
 
 /**
- * Return the usable API key. Encrypted keys (AES-256-GCM payloads produced by
- * encryptApiKey) are decrypted; anything else (legacy plaintext keys, or a
- * decrypt failure) is returned as-is so a misconfigured or legacy value never
- * breaks the whole gateway.
+ * Fail-closed decryption of a stored provider secret.
+ *
+ * Unlike a legacy lenient variant, this NEVER returns raw stored bytes when
+ * decryption fails: a missing/misconfigured AI_API_KEY_ENCRYPTION_KEY, a
+ * malformed payload, or an auth-tag mismatch all throw a secret-free
+ * configuration error. Ciphertext must never be treated as a plaintext key.
  */
-function safeDecrypt(key: string): string {
+class StoredSecretError extends Error {}
+
+function decryptStoredSecret(key: string): string {
   try {
     return decryptApiKey(key);
   } catch {
-    return key;
+    throw new StoredSecretError(
+      "Stored provider API key cannot be decrypted. Verify AI_API_KEY_ENCRYPTION_KEY or re-save the provider's API key.",
+    );
   }
 }
 
@@ -113,7 +120,10 @@ export async function createProvider(data: {
   input_cost_per_million?: number | null;
   output_cost_per_million?: number | null;
 }): Promise<AIProviderEntity> {
-  const encryptedKey = data.api_key?.trim() ? encryptApiKey(data.api_key.trim()) : null;
+  // Reject keyless creates for provider types that require a secret; blank
+  // secrets are never stored.
+  const { apiKey } = assertCreatableSecret(data.type, data.api_key);
+  const encryptedKey = apiKey ? encryptApiKey(apiKey) : null;
   return db.aiProvider.create({
     provider_key: data.provider_key,
     name: data.name,
@@ -133,8 +143,14 @@ export async function createProvider(data: {
 export async function updateProvider(id: string, data: Partial<AIProviderEntity>): Promise<AIProviderEntity | null> {
   try {
     const patch: Partial<AIProviderEntity> = { ...data };
-    if (patch.api_key !== undefined && patch.api_key) {
-      patch.api_key = encryptApiKey(patch.api_key.trim());
+    // Blank/whitespace api_key means "keep the existing key": strip it from the
+    // patch instead of overwriting (or storing an empty-string secret).
+    if ("api_key" in patch) {
+      delete patch.api_key;
+      const { apiKey } = resolveApiKeyPatch(data.api_key, encryptApiKey);
+      if (apiKey !== undefined) {
+        patch.api_key = apiKey;
+      }
     }
     return await db.aiProvider.update(id, patch);
   } catch {
@@ -162,28 +178,30 @@ export async function getEnabledProviders(): Promise<AIProviderEntity[]> {
 /**
  * Get provider with decrypted API key for internal gateway use.
  * Never expose this to the UI — use getProviderById for that.
+ *
+ * Fail-closed: DB failures resolve to null, but secret-decryption failures
+ * THROW (StoredSecretError) — a misconfigured encryption key must never be
+ * mistaken for "provider has no usable key".
  */
 export async function getProviderWithKey(id: string): Promise<AIProviderEntity | null> {
+  let provider: AIProviderEntity | null;
   try {
-    const provider = await db.aiProvider.getById(id);
-    if (!provider?.api_key) return provider;
-    return {
-      ...provider,
-      api_key: safeDecrypt(provider.api_key),
-    };
+    provider = await db.aiProvider.getById(id);
   } catch {
     return null;
   }
+  if (!provider?.api_key) return provider;
+  return { ...provider, api_key: decryptStoredSecret(provider.api_key) };
 }
 
 /**
  * Get enabled providers with decrypted API keys for gateway resolution.
- * Internal use only.
+ * Internal use only. See getProviderWithKey for the fail-closed contract.
  */
 export async function getEnabledProvidersWithKeys(): Promise<AIProviderEntity[]> {
   const providers = await getAllProviders();
   return providers
     .filter((p) => p.enabled)
     .sort((a, b) => a.priority - b.priority)
-    .map((p) => (p.api_key ? { ...p, api_key: safeDecrypt(p.api_key) } : p));
+    .map((p) => (p.api_key ? { ...p, api_key: decryptStoredSecret(p.api_key) } : p));
 }

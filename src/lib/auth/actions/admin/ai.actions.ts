@@ -33,7 +33,6 @@ import {
   getAllProvidersSafe,
   getProviderById,
   getProviderWithKey,
-  maskApiKey,
   updateProvider,
 } from "@/lib/db/repositories/ai-provider.repo";
 
@@ -121,7 +120,12 @@ export async function saveProvider(input: SaveProviderInput): Promise<ActionResu
     revalidatePath("/admin/settings");
     return { ok: true, data: { id: data.id ?? "" } };
   } catch (error) {
-    console.error("Failed to save provider:", error);
+    console.error("Failed to save provider:", error instanceof Error ? error.message : error);
+    // Surface the static validation message from the api-key policy (safe to
+    // show); everything else stays generic.
+    if (error instanceof Error && error.message === "An API key is required for this provider type.") {
+      return { ok: false, error: error.message };
+    }
     return { ok: false, error: "Failed to save provider." };
   }
 }
@@ -244,12 +248,15 @@ export async function testProviderConnection(input: {
         if (provider.type === "anthropic") {
           headers["x-api-key"] = key;
           headers["anthropic-version"] = "2023-06-01";
+        } else if (provider.type === "gemini") {
+          // Native Gemini API accepts the key via secure header — never as a
+          // URL query parameter (query strings leak into access/proxy logs).
+          headers["x-goog-api-key"] = key;
         } else {
           headers.Authorization = `Bearer ${key}`;
         }
       }
-      const url = provider.type === "gemini" ? `${endpoint}?key=${encodeURIComponent(key)}` : endpoint;
-      response = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+      response = await fetch(endpoint, { headers, signal: AbortSignal.timeout(15000) });
     } catch (fetchError) {
       const errMsg = fetchError instanceof Error ? fetchError.message : "Network error";
       await updateProvider(provider.id, {
@@ -443,5 +450,3 @@ export async function saveAIDefaults(input: SaveAIDefaultsInput): Promise<Action
     return { ok: false, error: "Failed to save AI defaults." };
   }
 }
-
-export { maskApiKey };

@@ -35,7 +35,13 @@ export function decryptApiKey(ciphertext: string): string {
     decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
   } catch (error) {
-    console.error("[ai-crypto] Failed to decrypt API key:", error);
+    // Log only the failure reason — never the ciphertext, key material, or the
+    // decrypted plaintext. The thrown message below is likewise secret-free so
+    // it is safe to surface in server logs and admin-facing errors.
+    console.error(
+      "[ai-crypto] Failed to decrypt stored API key:",
+      error instanceof Error ? error.message : "unknown error",
+    );
     throw new Error("Failed to decrypt API key. Check AI_API_KEY_ENCRYPTION_KEY.");
   }
 }

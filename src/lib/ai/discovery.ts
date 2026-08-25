@@ -54,14 +54,16 @@ export async function discoverModels(provider: AIProviderEntity): Promise<Discov
       if (provider.type === "anthropic") {
         headers["x-api-key"] = key;
         headers["anthropic-version"] = "2023-06-01";
+      } else if (provider.type === "gemini") {
+        // Native Gemini API accepts the key via secure header — never as a URL
+        // query parameter (query strings leak into access/proxy logs).
+        headers["x-goog-api-key"] = key;
       } else {
         headers.Authorization = `Bearer ${key}`;
       }
     }
 
-    const url = provider.type === "gemini" ? `${endpoint}?key=${encodeURIComponent(key)}` : endpoint;
-
-    const response = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+    const response = await fetch(endpoint, { headers, signal: AbortSignal.timeout(15000) });
     if (!response.ok) return { providerId: provider.id, models: [], rawCount: 0 };
 
     const data = await response.json();
