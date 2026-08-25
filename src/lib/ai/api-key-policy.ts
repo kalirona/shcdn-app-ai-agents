@@ -12,9 +12,7 @@ import type { AIProviderType } from "../db/entities";
  * - Only keyless provider types may be created without a secret.
  */
 
-export const KEYLESS_PROVIDER_TYPES: ReadonlySet<AIProviderType> = new Set<AIProviderType>([
-  "ollama",
-]);
+export const KEYLESS_PROVIDER_TYPES: ReadonlySet<AIProviderType> = new Set<AIProviderType>(["ollama"]);
 
 export function isBlankSecret(value: string | null | undefined): boolean {
   return value === null || value === undefined || value.trim().length === 0;
