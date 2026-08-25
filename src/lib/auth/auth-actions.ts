@@ -62,6 +62,14 @@ export async function directusSignInAction(
   _prevState: DirectusSignInState,
   formData: FormData,
 ): Promise<DirectusSignInState> {
+  // Legacy Directus actions stay exported for rollback, but they are exported
+  // from a "use server" module and therefore reachable via crafted POSTs even
+  // when their forms are never rendered. Hard-isolate them under Supabase so
+  // no production request can reach the Directus REST API.
+  if (isSupabase()) {
+    return { error: "Directus sign-in is disabled." };
+  }
+
   const parsed = directusLoginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -276,6 +284,12 @@ export async function directusSignUpAction(
   _prevState: DirectusSignUpState,
   formData: FormData,
 ): Promise<DirectusSignUpState> {
+  // See directusSignInAction: hard-disable under Supabase to keep the legacy
+  // Directus REST path unreachable in production.
+  if (isSupabase()) {
+    return { error: "Directus registration is disabled." };
+  }
+
   const settings = await getPlatformSettings();
   if (settings?.signup_enabled === false) {
     return { error: "Self-service registration is currently disabled. Ask your administrator for an invite." };

@@ -1,11 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import {
-  DIRECTUS_ACCESS_TOKEN_SKEW_MS,
-  DIRECTUS_SESSION_COOKIE,
-  DIRECTUS_SESSION_EXP_COOKIE,
-  SUPABASE_ACCESS_TOKEN_SKEW_MS,
-} from "@/lib/auth/provider";
+import { SUPABASE_ACCESS_TOKEN_SKEW_MS } from "@/lib/auth/provider";
 import { hasSupabaseSessionCookie, isSupabaseSessionNearExpiry } from "@/lib/auth/supabase-cookie";
 
 const PUBLIC_PATHS = ["/", "/auth", "/unauthorized", "/widget", "/a", "/api"];
@@ -20,38 +15,18 @@ function isPublicPath(pathname: string): boolean {
   });
 }
 
-function hasDirectusSession(request: NextRequest): boolean {
-  return Boolean(request.cookies.get(DIRECTUS_SESSION_COOKIE)?.value);
-}
-
 /**
- * A Directus session is near-expiry (or its expiry marker is missing) when the
- * access token is inside the refresh skew window. The edge runtime may not use
- * node:crypto, so it relies on the plaintext DIRECTUS_SESSION_EXP companion
- * cookie written alongside the encrypted session cookie.
- */
-function isDirectusSessionNearExpiry(request: NextRequest): boolean {
-  const raw = request.cookies.get(DIRECTUS_SESSION_EXP_COOKIE)?.value;
-  if (!raw) return true; // legacy cookie without the expiry marker -> revalidate
-  const expiresAt = Number(raw);
-  return !Number.isFinite(expiresAt) || Date.now() >= expiresAt - DIRECTUS_ACCESS_TOKEN_SKEW_MS;
-}
-
-/**
- * Provider-agnostic session checks. The Edge runtime cannot read non-NEXT_PUBLIC
- * env vars (AUTH_PROVIDER is not available), so the provider is detected from
- * cookie shape: an encrypted directus_session cookie vs @supabase/ssr's sb-*
- * cookies. Exactly one provider's cookies will ever be present for a given app.
+ * Supabase-only session check. The Edge runtime cannot read non-NEXT_PUBLIC env
+ * vars (AUTH_PROVIDER is not available), and legacy directus_session cookies are
+ * deliberately NOT recognized here: a stale/forged legacy cookie must never gate
+ * a route or trigger the refresh flow under AUTH_PROVIDER=supabase.
  */
 function hasSession(request: NextRequest): boolean {
-  return hasDirectusSession(request) || hasSupabaseSessionCookie(request.cookies.getAll());
+  return hasSupabaseSessionCookie(request.cookies.getAll());
 }
 
 function isSessionNearExpiry(request: NextRequest): boolean {
-  if (hasSupabaseSessionCookie(request.cookies.getAll())) {
-    return isSupabaseSessionNearExpiry(request.cookies.getAll(), SUPABASE_ACCESS_TOKEN_SKEW_MS);
-  }
-  return isDirectusSessionNearExpiry(request);
+  return isSupabaseSessionNearExpiry(request.cookies.getAll(), SUPABASE_ACCESS_TOKEN_SKEW_MS);
 }
 
 export async function proxy(request: NextRequest) {

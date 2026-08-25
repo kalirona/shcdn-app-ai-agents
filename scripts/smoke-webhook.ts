@@ -1,5 +1,12 @@
-process.env.DIRECTUS_URL = process.env.DIRECTUS_URL || "https://vip.sitenexai.com";
-process.env.DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN || "AHGd29-uqMpkrjjhtD5iVT1jtdkA-nld";
+// Directus-era smoke test (legacy/rollback only). Credentials are never
+// hardcoded: provide DIRECTUS_URL and DIRECTUS_TOKEN in the environment.
+const DIRECTUS_URL = process.env.DIRECTUS_URL?.replace(/\/$/, "");
+const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN;
+
+if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+  console.error("DIRECTUS_URL and DIRECTUS_TOKEN must be set to run this legacy smoke test.");
+  process.exit(1);
+}
 
 async function main() {
   const [{ db }, webhookRepo, { dispatchWebhook }] = await Promise.all([
@@ -32,7 +39,7 @@ async function main() {
   await db.webhookDelivery.getByWebhook(webhook.id).then((rows) =>
     Promise.all(
       rows.map((r) =>
-        fetch(`https://vip.sitenexai.com/items/webhook_deliveries/${r.id}`, {
+        fetch(`${DIRECTUS_URL}/items/webhook_deliveries/${r.id}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${process.env.DIRECTUS_TOKEN}` },
         }),
