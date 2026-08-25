@@ -43,7 +43,7 @@ export function assertCreatableSecret(
   type: AIProviderType,
   apiKey: string | null | undefined,
 ): { apiKey: string | null } {
-  const trimmed = apiKey?.trim() ?? "";
+  const trimmed = (apiKey ?? "").trim();
   if (trimmed.length === 0) {
     if (!KEYLESS_PROVIDER_TYPES.has(type)) {
       throw new Error("An API key is required for this provider type.");

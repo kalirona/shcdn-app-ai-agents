@@ -119,8 +119,8 @@ async function main(): Promise<void> {
     let seenGoogleHeader = "";
     const server = createServer((req, res) => {
       seenUrl = req.url ?? "";
-      seenAuthHeader = req.headers.authorization ?? "";
-      seenGoogleHeader = req.headers["x-goog-api-key"] ?? "";
+      seenAuthHeader = String(req.headers.authorization ?? "");
+      seenGoogleHeader = String(req.headers["x-goog-api-key"] ?? "");
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ models: [{ name: "models/gemini-2.0-flash" }] }));
     });

@@ -1,5 +1,5 @@
-import { decryptApiKey, encryptApiKey } from "@/lib/ai/crypto";
 import { assertCreatableSecret, resolveApiKeyPatch } from "@/lib/ai/api-key-policy";
+import { decryptApiKey, encryptApiKey } from "@/lib/ai/crypto";
 
 import { db } from "../client";
 import type { AICapability, AIProviderEntity, AIProviderKey, AIProviderType } from "../entities";
