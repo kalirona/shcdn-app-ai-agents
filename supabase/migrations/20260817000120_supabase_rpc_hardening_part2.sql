@@ -47,10 +47,21 @@ grant execute on function public.demote_super_admin(uuid)
 grant execute on function public.upsert_platform_settings(text, text, boolean, boolean, text, integer, boolean, text, integer, text, text, text, text, text, text, text, text)
   to service_role;
 
--- ---- PARTIAL: policy/identity helpers — drop PUBLIC+anon only ---------------
+-- ---- PARTIAL: policy/identity helpers --------------------------------------
+-- These three are evaluated INSIDE RLS policies whose roles = {public}, so
+-- Postgres requires EXECUTE for every role that can scan those tables —
+-- including anon. They are pure auth.uid()-bound boolean lookups (false for
+-- anonymous) and leak nothing. PUBLIC stays revoked; anon keeps EXECUTE only
+-- because anonymous table scans legitimately evaluate these policies.
 revoke execute on function public.is_super_admin()
-  from public, anon;
+  from public;
+grant execute on function public.is_super_admin()
+  to anon;
 revoke execute on function public.is_workspace_member(uuid)
-  from public, anon;
+  from public;
+grant execute on function public.is_workspace_member(uuid)
+  to anon;
 revoke execute on function public.is_workspace_admin(uuid)
-  from public, anon;
+  from public;
+grant execute on function public.is_workspace_admin(uuid)
+  to anon;
