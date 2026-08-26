@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { discoverModels, toModelEntities, parseModelList } from "@/lib/ai/discovery";
+import { discoverModels, parseModelList, toModelEntities } from "@/lib/ai/discovery";
 import { resolveProvider } from "@/lib/ai/registry";
 import { requirePlatformAccess } from "@/lib/auth/platform-access";
 import {

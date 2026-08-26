@@ -6,18 +6,11 @@
  *   npx tsx scripts/ai-crypto-verify.ts
  * Exits 0 only when every check passes.
  */
-import { createServer } from "node:http";
 
-import {
-  decryptApiKey,
-  encryptApiKey,
-} from "../src/lib/ai/crypto";
-import {
-  assertCreatableSecret,
-  isBlankSecret,
-  resolveApiKeyPatch,
-} from "../src/lib/ai/api-key-policy";
+import { assertCreatableSecret, isBlankSecret, resolveApiKeyPatch } from "../src/lib/ai/api-key-policy";
+import { decryptApiKey, encryptApiKey } from "../src/lib/ai/crypto";
 import { discoverModels } from "../src/lib/ai/discovery";
+import { createServer } from "node:http";
 
 let failures = 0;
 function check(name: string, fn: () => void | Promise<void>): Promise<void> {
