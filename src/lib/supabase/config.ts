@@ -35,7 +35,7 @@ export function requireSupabaseServiceRoleKey(): string {
         "Never expose this key in NEXT_PUBLIC_* environment variables or browser code.",
     );
   }
-  return SUPABASE_SERVICE_ROLE_KEY;
+  return key;
 }
 
 /**
