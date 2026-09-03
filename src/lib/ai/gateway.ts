@@ -12,10 +12,48 @@ import {
   type ChatResponse,
   type AITool,
   createAIProvider,
+  getProviderConfig,
 } from "./provider";
 import { toolRegistry } from "@/lib/tools";
 
 export type GatewayPurpose = "chat" | "fast" | "vision" | "embeddings" | "image" | "video";
+
+/**
+ * Legacy env-driven resolution used when no gateway provider is usable.
+ * Reads AI_PROVIDER (default openai) and the matching provider API key from
+ * the environment. Returns null when no env key is configured.
+ */
+function legacyResolution(purpose: GatewayPurpose = "chat"): GatewayResolution | null {
+  const providerKey = (process.env.AI_PROVIDER ?? "openai").trim() as AIProvider;
+  const config = getProviderConfig(providerKey);
+  if (!config.apiKey) return null;
+  const now = new Date().toISOString();
+  const embeddingOverride = process.env.AI_EMBEDDING_MODEL?.trim();
+  const modelId =
+    purpose === "embeddings" && embeddingOverride
+      ? embeddingOverride
+      : process.env.AI_DEFAULT_MODEL?.trim() || config.defaultModel;
+  return {
+    provider: {
+      id: "legacy-env",
+      provider_key: providerKey,
+      name: `Legacy env provider (${providerKey})`,
+      type: "custom",
+      api_key: config.apiKey,
+      base_url: config.baseUrl,
+      enabled: true,
+      priority: 9999,
+      default_model: modelId,
+      capabilities: ["chat", "vision", "embeddings"],
+      status: "untested",
+      last_tested_at: null,
+      last_error: null,
+      discoverable: false,
+      date_updated: now,
+    } as AIProviderEntity,
+    modelId,
+  };
+}
 
 export interface RuntimeModelConfig {
   providerKey: string;
@@ -136,7 +174,7 @@ export async function createGateway(): Promise<Gateway> {
    * Returns null when no allowed combination exists.
    */
   async function resolve(purpose: GatewayPurpose = "chat"): Promise<GatewayResolution | null> {
-    if (providers.length === 0) return null;
+    if (providers.length === 0) return legacyResolution(purpose);
 
     const requiredCapability = purposeToCapability(purpose);
     const targetModel = await resolveDefaultModel(defaults, purpose);
@@ -169,7 +207,10 @@ export async function createGateway(): Promise<Gateway> {
       }
     }
 
-    return null;
+    // 4) Legacy env-driven fallback (documented contract): when no DB provider
+    // resolves, use the env-configured provider (AI_PROVIDER + provider API key)
+    // so the platform keeps working before an admin sets up gateway providers.
+    return legacyResolution(purpose);
   }
 
   return {

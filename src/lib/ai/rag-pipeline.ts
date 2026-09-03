@@ -450,12 +450,28 @@ export async function ragQuery(context: RagContext): Promise<RagResult> {
       agent: context.agent.id ?? null,
     });
 
-    // Also check for tool calls in AI response (for multi-step)
+    // Also check for tool calls in AI response (for multi-step). Handles both
+    // native OpenAI-style tool_calls and text-based "TOOL_CALL:" blocks.
     let iterations = 0;
     const maxIterations = 3;
     while (iterations < maxIterations) {
       iterations++;
-      const toolCalls = parseToolCalls(response.content);
+      let toolCalls: Array<{ name: string; arguments: Record<string, unknown> }> | null = null;
+      if (response.toolCalls && response.toolCalls.length > 0) {
+        toolCalls = [];
+        for (const tc of response.toolCalls) {
+          try {
+            toolCalls.push({
+              name: tc.function.name,
+              arguments: JSON.parse(tc.function.arguments || "{}") as Record<string, unknown>,
+            });
+          } catch {
+            // Invalid JSON arguments — skip this call
+          }
+        }
+        if (toolCalls.length === 0) toolCalls = null;
+      }
+      if (!toolCalls) toolCalls = parseToolCalls(response.content);
       if (!toolCalls || toolCalls.length === 0) break;
 
       for (const toolCall of toolCalls) {
@@ -465,7 +481,9 @@ export async function ragQuery(context: RagContext): Promise<RagResult> {
             agentId: context.agent.id,
             conversationId: context.conversationId,
           });
-          messages.push({ role: "assistant", content: response.content });
+          if (response.content?.trim()) {
+            messages.push({ role: "assistant", content: response.content });
+          }
           messages.push({ role: "user", content: `Tool result for ${toolCall.name}: ${JSON.stringify(result)}` });
         } catch (toolError) {
           console.error(`Tool ${toolCall.name} failed:`, toolError);

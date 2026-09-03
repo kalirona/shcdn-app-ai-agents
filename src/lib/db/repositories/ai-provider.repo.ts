@@ -198,10 +198,30 @@ export async function getProviderWithKey(id: string): Promise<AIProviderEntity |
  * Get enabled providers with decrypted API keys for gateway resolution.
  * Internal use only. See getProviderWithKey for the fail-closed contract.
  */
+/**
+ * Get enabled providers with decrypted API keys for gateway resolution.
+ * Internal use only. See getProviderWithKey for the fail-closed contract.
+ *
+ * Providers whose stored secret cannot be decrypted are SKIPPED (with a loud
+ * server-side log) instead of throwing: a single stale key must not take down
+ * AI resolution for the whole platform — the gateway falls back to remaining
+ * providers or the legacy env-driven path.
+ */
 export async function getEnabledProvidersWithKeys(): Promise<AIProviderEntity[]> {
   const providers = await getAllProviders();
-  return providers
-    .filter((p) => p.enabled)
-    .sort((a, b) => a.priority - b.priority)
-    .map((p) => (p.api_key ? { ...p, api_key: decryptStoredSecret(p.api_key) } : p));
+  const usable: AIProviderEntity[] = [];
+  for (const p of providers.filter((p) => p.enabled).sort((a, b) => a.priority - b.priority)) {
+    if (!p.api_key) {
+      usable.push(p);
+      continue;
+    }
+    try {
+      usable.push({ ...p, api_key: decryptStoredSecret(p.api_key) });
+    } catch {
+      console.error(
+        `[ai-provider.repo] Provider "${p.name}" (${p.provider_key}) has an undecryptable stored API key — skipping it. Re-save the key in Admin → Settings → AI Providers.`,
+      );
+    }
+  }
+  return usable;
 }

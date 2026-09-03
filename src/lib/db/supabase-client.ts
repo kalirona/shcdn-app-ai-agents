@@ -165,7 +165,20 @@ function applyFilter(builder: QueryBuilder, filter: Record<string, unknown>, con
 }
 
 function throwSupabase(operation: string, error: unknown): never {
-  const message = error instanceof Error ? error.message : String(error);
+  let message: string;
+  if (error instanceof Error) {
+    message = error.message;
+  } else if (error && typeof error === "object") {
+    // PostgREST / Supabase errors carry message, details, hint, code fields.
+    const e = error as { message?: string; details?: string; hint?: string; code?: string };
+    message = e.message ?? JSON.stringify(error);
+    if (e.details) message += ` | details: ${e.details}`;
+    if (e.hint) message += ` | hint: ${e.hint}`;
+    if (e.code) message += ` | code: ${e.code}`;
+  } else {
+    message = String(error);
+  }
+  console.error(`[supabase-client] ${operation} failed:`, message);
   throw new Error(`Supabase ${operation} failed: ${message}`);
 }
 

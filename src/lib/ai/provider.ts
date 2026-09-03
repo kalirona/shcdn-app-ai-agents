@@ -296,6 +296,7 @@ async function openaiChat(
 
   if (!response.ok) {
     const error = await response.text();
+    console.error(`[ai-provider] openaiChat failed: model=${model} bodyModel=${(body as { model?: string }).model}`);
     throw new Error(`Chat error [${response.status}]: ${error}`);
   }
 
