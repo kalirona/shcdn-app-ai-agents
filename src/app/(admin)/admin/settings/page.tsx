@@ -14,7 +14,7 @@ import { AIProvidersSection } from "./_components/ai-providers-section";
 import { EmailSection } from "./_components/email-section";
 import { GeneralSection } from "./_components/general-section";
 import { SecuritySection } from "./_components/security-section";
-import { SettingsNav } from "./_components/settings-nav";
+import { SettingsShell } from "./_components/settings-shell";
 import { StorageSection } from "./_components/storage-section";
 import { SystemSection } from "./_components/system-section";
 import { UsageSection } from "./_components/usage-section";
@@ -88,6 +88,65 @@ export default async function AdminSettingsPage() {
     system: <SystemSection providers={providers} modelsTotal={modelCount} />,
   };
 
+  const sections: Record<SettingsSectionId, ReactNode> = {
+    general: (
+      <SettingsHeader title="General" description="Core platform identity and signup behavior.">
+        {content.general}
+      </SettingsHeader>
+    ),
+    "ai-providers": (
+      <SettingsHeader
+        title="AI Providers"
+        description="Manage API keys, base URLs, and connection to each AI provider. Enable or disable providers, test connections, and discover real models."
+        headerRight={<Badge variant={enabledCount > 0 ? "default" : "secondary"}>{enabledCount} enabled</Badge>}
+      >
+        {content["ai-providers"]}
+      </SettingsHeader>
+    ),
+    "ai-models": (
+      <SettingsHeader
+        title="AI Models"
+        description="The model registry. Models are discovered from connected providers. Use search, filters, and pagination to manage them."
+        headerRight={<Badge variant="outline">{modelCount} models</Badge>}
+      >
+        {content["ai-models"]}
+      </SettingsHeader>
+    ),
+    "ai-defaults": (
+      <SettingsHeader
+        title="AI Defaults"
+        description="Platform-level default models per capability and the default system prompt. Agents and workspaces may override these."
+      >
+        {content["ai-defaults"]}
+      </SettingsHeader>
+    ),
+    usage: (
+      <SettingsHeader title="Usage & Limits" description="Platform utilization and configured limits.">
+        {content.usage}
+      </SettingsHeader>
+    ),
+    security: (
+      <SettingsHeader title="Security" description="Authentication and session hardening.">
+        {content.security}
+      </SettingsHeader>
+    ),
+    email: (
+      <SettingsHeader title="Email" description="Outbound SMTP configuration for platform notifications.">
+        {content.email}
+      </SettingsHeader>
+    ),
+    storage: (
+      <SettingsHeader title="Storage" description="Object storage (Cloudflare R2) for uploads and assets.">
+        {content.storage}
+      </SettingsHeader>
+    ),
+    system: (
+      <SettingsHeader title="System" description="Environment, versions, and infrastructure status.">
+        {content.system}
+      </SettingsHeader>
+    ),
+  };
+
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div>
@@ -97,85 +156,8 @@ export default async function AdminSettingsPage() {
         </p>
       </div>
 
-      <div className="flex flex-col gap-8 md:flex-row md:items-start">
-        <SettingsNav groups={SETTINGS_GROUPS} />
-
-        <main className="min-w-0 flex-1 space-y-4">
-          <SectionAnchor id="general">
-            <SettingsHeader title="General" description="Core platform identity and signup behavior.">
-              {content.general}
-            </SettingsHeader>
-          </SectionAnchor>
-
-          <SectionAnchor id="ai-providers">
-            <SettingsHeader
-              title="AI Providers"
-              description="Manage API keys, base URLs, and connection to each AI provider. Enable or disable providers, test connections, and discover real models."
-              headerRight={<Badge variant={enabledCount > 0 ? "default" : "secondary"}>{enabledCount} enabled</Badge>}
-            >
-              {content["ai-providers"]}
-            </SettingsHeader>
-          </SectionAnchor>
-
-          <SectionAnchor id="ai-models">
-            <SettingsHeader
-              title="AI Models"
-              description="The model registry. Models are discovered from connected providers rather than populated from stale static lists."
-              headerRight={<Badge variant="outline">{modelCount} models</Badge>}
-            >
-              {content["ai-models"]}
-            </SettingsHeader>
-          </SectionAnchor>
-
-          <SectionAnchor id="ai-defaults">
-            <SettingsHeader
-              title="AI Defaults"
-              description="Platform-level default models per capability and the default system prompt. Agents and workspaces may override these."
-            >
-              {content["ai-defaults"]}
-            </SettingsHeader>
-          </SectionAnchor>
-
-          <SectionAnchor id="usage">
-            <SettingsHeader title="Usage & Limits" description="Platform utilization and configured limits.">
-              {content.usage}
-            </SettingsHeader>
-          </SectionAnchor>
-
-          <SectionAnchor id="security">
-            <SettingsHeader title="Security" description="Authentication and session hardening.">
-              {content.security}
-            </SettingsHeader>
-          </SectionAnchor>
-
-          <SectionAnchor id="email">
-            <SettingsHeader title="Email" description="Outbound SMTP configuration for platform notifications.">
-              {content.email}
-            </SettingsHeader>
-          </SectionAnchor>
-
-          <SectionAnchor id="storage">
-            <SettingsHeader title="Storage" description="Object storage (Cloudflare R2) for uploads and assets.">
-              {content.storage}
-            </SettingsHeader>
-          </SectionAnchor>
-
-          <SectionAnchor id="system">
-            <SettingsHeader title="System" description="Environment, versions, and infrastructure status.">
-              {content.system}
-            </SettingsHeader>
-          </SectionAnchor>
-        </main>
-      </div>
+      <SettingsShell groups={SETTINGS_GROUPS} sections={sections} />
     </div>
-  );
-}
-
-function SectionAnchor({ id, children }: { id: string; children: ReactNode }) {
-  return (
-    <section id={id} className="scroll-mt-20">
-      {children}
-    </section>
   );
 }
 

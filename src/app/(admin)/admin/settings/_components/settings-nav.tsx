@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { Boxes, Building2, Cpu, Gauge, Globe, Mail, Shield, SlidersHorizontal } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -23,35 +22,11 @@ const SECTION_ICONS: Record<SettingsSectionId, LucideIcon> = {
 
 interface Props {
   groups: Array<{ label: string; sections: SettingsSectionDef[] }>;
+  activeId: SettingsSectionId;
+  onActiveChange: (id: SettingsSectionId) => void;
 }
 
-export function SettingsNav({ groups }: Props) {
-  const [activeId, setActiveId] = useState<SettingsSectionId>("general");
-
-  useEffect(() => {
-    const ids = groups.flatMap((g) => g.sections.map((s) => s.id));
-    const sections = ids
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => el !== null);
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Pick the topmost section currently in view.
-        const visible = entries.filter((e) => e.isIntersecting);
-        if (visible.length > 0) {
-          const top = visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-          setActiveId((top.target as HTMLElement).id as SettingsSectionId);
-        }
-      },
-      { rootMargin: "-20% 0px -70% 0px", threshold: 0 },
-    );
-
-    sections.forEach((el) => {
-      observer.observe(el);
-    });
-    return () => observer.disconnect();
-  }, [groups]);
-
+export function SettingsNav({ groups, activeId, onActiveChange }: Props) {
   return (
     <nav aria-label="Platform settings sections" className="sticky top-6 flex w-full shrink-0 flex-col gap-4 md:w-52">
       {groups.map((group) => (
@@ -61,18 +36,19 @@ export function SettingsNav({ groups }: Props) {
             const Icon = SECTION_ICONS[section.id];
             const isActive = section.id === activeId;
             return (
-              <a
+              <button
                 key={section.id}
-                href={`#${section.id}`}
+                type="button"
+                onClick={() => onActiveChange(section.id)}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-lg px-3 py-2 font-medium text-sm transition-colors",
+                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-sm transition-colors",
                   "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                   isActive && "bg-muted text-foreground",
                 )}
               >
                 <Icon className="size-4 shrink-0" />
                 {section.label}
-              </a>
+              </button>
             );
           })}
         </div>
