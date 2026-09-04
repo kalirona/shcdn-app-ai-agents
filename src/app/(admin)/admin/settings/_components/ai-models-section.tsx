@@ -45,7 +45,7 @@ export function AIModelsSection({ initialModels, initialProviders }: Props) {
   const [providers] = useState<AIProviderSafe[]>(initialProviders);
   const [providerFilter, setProviderFilter] = useState<string>("all");
   const [capabilityFilter, setCapabilityFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("enabled");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<AIModelSafe | null>(null);
   const [capsDraft, setCapsDraft] = useState<string[]>([]);
