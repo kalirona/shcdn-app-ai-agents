@@ -282,10 +282,44 @@ chat: async (options) => {
           `with ${requiredCapability} capability, then set a default model in AI Defaults.`
         );
       }
-      const adapter = createProviderAdapter(resolution.provider);
-      const response = await adapter.chat({ ...options, model: resolution.modelId || options.model, tools });
-      await logCost(resolution.provider, resolution.modelId, options, response, enabledModels);
-      return response;
+
+      // Build the ordered candidate list: the resolved default first, then
+      // every other enabled model with the required capability. On transient
+      // failures (429 rate limits / 5xx — common on free tiers) fail over to
+      // the next candidate instead of degrading the whole request.
+      const candidates: Array<{ provider: AIProviderEntity; modelId: string | null }> = [];
+      const pushCandidate = (provider: AIProviderEntity | undefined, modelId: string | null | undefined) => {
+        if (!provider || !modelId) return;
+        if (!allowedModel(modelId, provider.id, requiredCapability)) return;
+        if (candidates.some((c) => c.modelId === modelId && c.provider.id === provider.id)) return;
+        candidates.push({ provider, modelId });
+      };
+      pushCandidate(resolution.provider, resolution.modelId);
+      for (const provider of providers) {
+        for (const m of enabledModels) {
+          if (m.provider === provider.id && m.capabilities.includes(requiredCapability)) {
+            pushCandidate(provider, m.modelId);
+          }
+        }
+      }
+      if (candidates.length === 0) candidates.push({ provider: resolution.provider, modelId: resolution.modelId });
+
+      let lastError: unknown;
+      for (const candidate of candidates) {
+        const adapter = createProviderAdapter(candidate.provider);
+        try {
+          const response = await adapter.chat({ ...options, model: candidate.modelId || options.model, tools });
+          await logCost(candidate.provider, candidate.modelId || options.model || "unknown", options, response, enabledModels);
+          return response;
+        } catch (error) {
+          lastError = error;
+          const msg = error instanceof Error ? error.message : String(error);
+          const transient = /\b(429|5\d\d|timeout|ECONNRESET|ECONNREFUSED|fetch failed|rate.?limit)\b/i.test(msg);
+          console.error(`Gateway model ${candidate.provider.provider_key}/${candidate.modelId} failed:`, msg.slice(0, 300));
+          if (!transient) throw error;
+        }
+      }
+      throw lastError;
     },
   };
 }

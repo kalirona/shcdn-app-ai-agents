@@ -1,7 +1,7 @@
 import type { AgentEntity } from "@/lib/db/entities";
 import { getAIDefaults } from "@/lib/db/repositories/ai-defaults.repo";
 
-import { createGateway, type GatewayPurpose } from "./gateway";
+import { createGateway, type Gateway, type GatewayPurpose } from "./gateway";
 import { type AIMessage, type AIProviderAdapter, type AIToolCall } from "./provider";
 import { type SearchResult, vectorSearch } from "./vector-search";
 import { toolRegistry, registerAllTools } from "@/lib/tools";
@@ -376,6 +376,40 @@ function ensureToolsRegistered() {
   }
 }
 
+/**
+ * Chat with retry/backoff for transient provider failures (429 rate limits,
+ * 5xx, network timeouts). Free-tier models fail intermittently — a single
+ * failure should never immediately degrade to the agent fallback message.
+ */
+async function chatWithRetry(
+  gateway: Awaited<ReturnType<typeof createGateway>>,
+  messages: AIMessage[],
+  context: RagContext,
+): Promise<Awaited<ReturnType<Gateway["chat"]>>> {
+  const maxAttempts = 3;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await gateway.chat({
+        messages,
+        temperature: 0.3,
+        maxTokens: 500,
+        purpose: "chat",
+        workspace: context.agent.workspace ?? null,
+        agent: context.agent.id ?? null,
+      });
+    } catch (error) {
+      lastError = error;
+      const msg = error instanceof Error ? error.message : String(error);
+      const transient = /\b(429|5\d\d|timeout|ECONNRESET|ECONNREFUSED|fetch failed|rate.?limit)\b/i.test(msg) || !msg;
+      console.error(`AI chat attempt ${attempt}/${maxAttempts} failed:`, msg);
+      if (!transient || attempt === maxAttempts) break;
+      await new Promise((r) => setTimeout(r, 800 * attempt));
+    }
+  }
+  throw lastError;
+}
+
 export async function ragQuery(context: RagContext): Promise<RagResult> {
   ensureToolsRegistered();
   const adapters = await runtimeAdapters("chat");
@@ -441,14 +475,7 @@ export async function ragQuery(context: RagContext): Promise<RagResult> {
 
   try {
     const gateway = await createGateway();
-    let response = await gateway.chat({
-      messages,
-      temperature: 0.3,
-      maxTokens: 500,
-      purpose: "chat",
-      workspace: context.agent.workspace ?? null,
-      agent: context.agent.id ?? null,
-    });
+    let response = await chatWithRetry(gateway, messages, context);
 
     // Also check for tool calls in AI response (for multi-step). Handles both
     // native OpenAI-style tool_calls and text-based "TOOL_CALL:" blocks.
@@ -491,14 +518,7 @@ export async function ragQuery(context: RagContext): Promise<RagResult> {
         }
       }
 
-      response = await gateway.chat({
-        messages,
-        temperature: 0.3,
-        maxTokens: 500,
-        purpose: "chat",
-        workspace: context.agent.workspace ?? null,
-        agent: context.agent.id ?? null,
-      });
+      response = await chatWithRetry(gateway, messages, context);
     }
 
     const finalContent = stripToolCalls(response.content);
@@ -616,6 +636,35 @@ export async function * ragStreamQuery(context: RagContext): AsyncGenerator<RagS
     };
   } catch (error) {
     console.error("RAG stream chat call failed:", error);
+    // Retry once via non-streaming chat before degrading to the fallback
+    // message — free-tier models fail intermittently (429/5xx/timeouts).
+    try {
+      const gateway = await createGateway();
+      const retry = await gateway.chat({
+        messages,
+        temperature: 0.3,
+        maxTokens: 500,
+        purpose: "chat",
+        workspace: context.agent.workspace ?? null,
+        agent: context.agent.id ?? null,
+      });
+      const content = stripToolCalls(retry.content).trim();
+      if (content) {
+        yield { content, done: false };
+        yield {
+          content: "",
+          done: true,
+          sources: searchResults.map((r) => ({
+            title: r.sourceTitle,
+            url: r.sourceUrl,
+            chunkId: r.id,
+          })),
+        };
+        return;
+      }
+    } catch (retryError) {
+      console.error("RAG stream non-streaming retry failed:", retryError);
+    }
     yield {
       content: context.agent.fallback_message,
       done: true,
