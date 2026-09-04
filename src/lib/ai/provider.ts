@@ -191,13 +191,35 @@ export function createAIProvider(provider: AIProvider, overrides: ProviderConfig
   return {
     async chat(options: ChatOptions): Promise<ChatResponse> {
       const model = options.model ?? config.defaultModel;
+      const call = () => {
+        if (provider === "anthropic") {
+          return anthropicChat(config.baseUrl, config.apiKey, model, options);
+        }
+        const isRouter = provider === "openrouter";
+        return openaiChat(openAiCompatBaseUrl(provider, config.baseUrl), config.apiKey, model, options, isRouter);
+      };
 
-      if (provider === "anthropic") {
-        return anthropicChat(config.baseUrl, config.apiKey, model, options);
+      // Free-tier models on routers frequently return transient 429/5xx or
+      // network hiccups; retry a few times with backoff before giving up so a
+      // single blip doesn't surface as the agent fallback message.
+      const maxAttempts = 4;
+      let lastError: unknown;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          return await call();
+        } catch (error) {
+          lastError = error;
+          const message = error instanceof Error ? error.message : String(error);
+          const statusMatch = message.match(/\[(\d{3})\]/);
+          const status = statusMatch ? Number(statusMatch[1]) : 0;
+          const transient = status === 429 || status === 0 || (status >= 500 && status < 600);
+          if (!transient || attempt === maxAttempts) break;
+          const delayMs = Math.min(500 * 2 ** (attempt - 1), 4000);
+          console.warn(`[ai-provider] transient chat failure (${status || "network"}), retry ${attempt}/${maxAttempts - 1} in ${delayMs}ms`);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
       }
-
-      const isRouter = provider === "openrouter";
-      return openaiChat(openAiCompatBaseUrl(provider, config.baseUrl), config.apiKey, model, options, isRouter);
+      throw lastError;
     },
 
     async *streamChat(options: ChatOptions): AsyncGenerator<StreamChunk> {
