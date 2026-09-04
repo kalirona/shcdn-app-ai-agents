@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
-import { Loader2, RefreshCw, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +51,13 @@ export function AIModelsSection({ initialModels, initialProviders }: Props) {
   const [capsDraft, setCapsDraft] = useState<string[]>([]);
   const [syncProviderId, setSyncProviderId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+
+  // Reset to the first page whenever filters or search change.
+  useEffect(() => {
+    setPage(1);
+  }, [providerFilter, capabilityFilter, statusFilter, search]);
 
   function refresh() {
     void getAdminAIModels().then((m) => setModels(m));
@@ -115,6 +122,12 @@ export function AIModelsSection({ initialModels, initialProviders }: Props) {
 
   const enabledCount = models.filter((m) => m.enabled).length;
   const providerOptions = providers.filter((p) => p.id);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
   return (
     <div className="space-y-4">
@@ -195,7 +208,7 @@ export function AIModelsSection({ initialModels, initialProviders }: Props) {
                 </TableCell>
               </TableRow>
             )}
-            {filtered.map((model) => (
+            {paged.map((model) => (
               <TableRow key={model.id}>
                 <TableCell className="text-muted-foreground text-xs">{model.providerName}</TableCell>
                 <TableCell>
@@ -237,6 +250,37 @@ export function AIModelsSection({ initialModels, initialProviders }: Props) {
           </TableBody>
         </Table>
       </div>
+
+      {pageCount > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <p className="text-muted-foreground text-xs">
+            Showing {rangeStart}–{rangeEnd} of {filtered.length} models
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={currentPage <= 1}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              <ChevronLeft className="size-4" />
+              Prev
+            </Button>
+            <span className="text-muted-foreground text-sm">
+              Page {currentPage} of {pageCount}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={currentPage >= pageCount}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent className="sm:max-w-md">
