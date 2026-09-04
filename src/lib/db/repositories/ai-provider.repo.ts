@@ -194,18 +194,26 @@ export async function getProviderWithKey(id: string): Promise<AIProviderEntity |
   return { ...provider, api_key: decryptStoredSecret(provider.api_key) };
 }
 
-/**
- * Get enabled providers with decrypted API keys for gateway resolution.
- * Internal use only. See getProviderWithKey for the fail-closed contract.
- */
+/** Map a provider key to the env var that holds its API key (legacy path). */
+const PROVIDER_ENV_KEY: Partial<Record<AIProviderKey, string>> = {
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+  gemini: "GEMINI_API_KEY",
+  glm: "GLM_API_KEY",
+  together: "TOGETHER_API_KEY",
+  groq: "GROQ_API_KEY",
+};
+
 /**
  * Get enabled providers with decrypted API keys for gateway resolution.
  * Internal use only. See getProviderWithKey for the fail-closed contract.
  *
- * Providers whose stored secret cannot be decrypted are SKIPPED (with a loud
- * server-side log) instead of throwing: a single stale key must not take down
- * AI resolution for the whole platform — the gateway falls back to remaining
- * providers or the legacy env-driven path.
+ * Providers whose stored secret cannot be decrypted are NOT dropped unless there
+ * is truly no key to use: they fall back to the matching provider env key
+ * (e.g. OPENROUTER_API_KEY) so admin-selected models keep working even when the
+ * DB encryption key doesn't match this environment. A provider with neither a
+ * working stored secret nor an env key is skipped (with a loud server-side log).
  */
 export async function getEnabledProvidersWithKeys(): Promise<AIProviderEntity[]> {
   const providers = await getAllProviders();
@@ -218,9 +226,20 @@ export async function getEnabledProvidersWithKeys(): Promise<AIProviderEntity[]>
     try {
       usable.push({ ...p, api_key: decryptStoredSecret(p.api_key) });
     } catch {
-      console.error(
-        `[ai-provider.repo] Provider "${p.name}" (${p.provider_key}) has an undecryptable stored API key — skipping it. Re-save the key in Admin → Settings → AI Providers.`,
-      );
+      // Stored key can't be decrypted with this environment's encryption key.
+      // Fall back to the matching provider env key so admin-selected models still work.
+      const envVar = PROVIDER_ENV_KEY[p.provider_key];
+      const envKey = envVar ? (process.env[envVar] ?? "").trim() : "";
+      if (envKey) {
+        console.error(
+          `[ai-provider.repo] Provider "${p.name}" (${p.provider_key}) stored key is undecryptable — falling back to ${envVar} env key. To use the stored key, set AI_API_KEY_ENCRYPTION_KEY to the value used to save it.`,
+        );
+        usable.push({ ...p, api_key: envKey });
+      } else {
+        console.error(
+          `[ai-provider.repo] Provider "${p.name}" (${p.provider_key}) has an undecryptable stored API key and no ${envVar ?? "matching env"} fallback — skipping it. Re-save the key in Admin → Settings → AI Providers.`,
+        );
+      }
     }
   }
   return usable;
