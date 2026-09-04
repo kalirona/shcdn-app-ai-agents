@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { dispatchWebhook } from "@/lib/webhooks/delivery";
 
 import { db } from "../client";
@@ -27,6 +29,22 @@ export async function createConversation(params: CreateConversationParams): Prom
 }
 
 /**
+ * The Supabase conversations table stores the session key in customer_id
+ * (a uuid column). Widget sessions are crypto.randomUUID() strings, but any
+ * non-UUID session id (legacy localStorage values, custom integrations) would
+ * make Postgres reject the query (22P02) and break the whole chat. Normalize
+ * non-UUID session ids into a stable, deterministic UUID so the same session
+ * id always maps to the same conversation.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function toSessionKey(sessionId: string): string {
+  if (UUID_RE.test(sessionId)) return sessionId;
+  return createHash("sha256").update(`widget-session:${sessionId}`).digest("hex").slice(0, 32)
+    .replace(/^(.{8})(.{4})(.{4})(.{4})/, "$1-$2-$3-$4-");
+}
+
+/**
  * Resolve a widget/session conversation. The customer column is used as the
  * stable session key (a UUID string) so a session always maps to the same
  * conversation regardless of the auto-increment primary key.
@@ -38,13 +56,14 @@ export async function getOrCreateSessionConversation(params: {
   customerName?: string;
   customerEmail?: string;
 }): Promise<ConversationEntity> {
-  const existing = await db.conversation.getBySession(params.sessionId);
+  const sessionKey = toSessionKey(params.sessionId);
+  const existing = await db.conversation.getBySession(sessionKey);
   if (existing[0]) return existing[0];
 
   return createConversation({
     workspace: params.workspace,
     agent: params.agent,
-    customer: params.sessionId,
+    customer: sessionKey,
     customerEmail: params.customerEmail,
     customerName: params.customerName,
   });
