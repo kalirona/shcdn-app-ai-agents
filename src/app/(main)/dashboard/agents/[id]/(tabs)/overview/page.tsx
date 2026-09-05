@@ -89,8 +89,12 @@ export default function OverviewPage() {
     toast.success("Public link copied!");
   }
 
-  function copyEmbedCode() {
-    const code = `<script src="${window.location.origin}/widget.js" data-agent="${agentId}"></script>`;
+    function copyEmbedCode() {
+    // Use the app origin (NEXT_PUBLIC_APP_URL), NOT window.location.origin —
+    // this dashboard lives on our domain, but the copied code is pasted on
+    // the customer's site, where window.location.origin would be wrong.
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    const code = `<script src="${baseUrl}/embed.js" data-agent="${agentId}" data-base-url="${baseUrl}"></script>`;
     navigator.clipboard.writeText(code);
     toast.success("Embed code copied!");
   }

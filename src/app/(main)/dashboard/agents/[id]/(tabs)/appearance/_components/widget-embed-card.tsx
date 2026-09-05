@@ -17,49 +17,11 @@ export function WidgetEmbedCard({ agentId }: { agentId: string }) {
   const [position, setPosition] = useState<"bottom-right" | "bottom-left">("bottom-right");
 
   function generateEmbedCode() {
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const code = `<!-- Agent AI Chat Widget -->
-<script>
-(function() {
-  var config = {
-    agentId: "${agentId}",
-    baseUrl: "${baseUrl}",
-    primaryColor: "${primaryColor}",
-    position: "${position}"
-  };
-
-  var iframe = document.createElement('iframe');
-  iframe.src = config.baseUrl + '/widget?agent=' + config.agentId;
-  iframe.id = 'agent-ai-widget-frame';
-  iframe.style.cssText = 'position:fixed;bottom:20px;${position === "bottom-left" ? "left" : "right"}:20px;width:0;height:0;border:none;z-index:999999;transition:all 0.3s ease;';
-
-  var toggle = document.createElement('button');
-  toggle.id = 'agent-ai-widget-toggle';
-  toggle.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
-  toggle.style.cssText = 'position:fixed;bottom:20px;${position === "bottom-left" ? "left" : "right"}:20px;width:56px;height:56px;border-radius:50%;border:none;background:' + config.primaryColor + ';color:white;cursor:pointer;z-index:999998;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;';
-
-  var isOpen = false;
-  toggle.addEventListener('click', function() {
-    isOpen = !isOpen;
-    if (isOpen) {
-      iframe.style.width = '380px';
-      iframe.style.height = '600px';
-      iframe.style.bottom = '88px';
-      iframe.style.borderRadius = '12px';
-      iframe.style.boxShadow = '0 8px 32px rgba(0,0,0,0.12)';
-      toggle.style.transform = 'scale(0.9)';
-    } else {
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      toggle.style.transform = 'scale(1)';
-    }
-  });
-
-  document.body.appendChild(iframe);
-  document.body.appendChild(toggle);
-})();
-</script>
-<!-- End Agent AI Chat Widget -->`;
+    // CRITICAL: use the application origin (from NEXT_PUBLIC_APP_URL), NOT
+    // window.location.origin. On a customer site the iframe must point at this
+    // app's /widget route, otherwise it would embed the host site itself.
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    const code = `<!-- Agent AI Chat Widget -->\n<script src="${baseUrl}/embed.js"\n        data-agent="${agentId}"\n        data-base-url="${baseUrl}"\n        data-position="${position}"\n        data-primary-color="${primaryColor}">\n</script>\n<!-- End Agent AI Chat Widget -->`;
 
     setEmbedCode(code);
     toast.success("Embed code generated!");
@@ -140,7 +102,7 @@ export function WidgetEmbedCard({ agentId }: { agentId: string }) {
               </Button>
             </div>
             <div className="rounded-md border border-green-200 bg-green-50 p-3 text-green-800 text-xs">
-              <strong>Instructions:</strong> Paste this code before the closing &lt;/body&gt; tag on any page of your website. The widget will appear as a chat button.
+              <strong>Instructions:</strong> Paste the single <code>script</code> tag above before the closing &lt;/body&gt; tag on any page of your website. The widget will appear as a chat button in the corner you selected.
             </div>
           </div>
         )}
