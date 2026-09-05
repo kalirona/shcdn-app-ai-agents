@@ -105,7 +105,11 @@ export async function POST(request: NextRequest) {
         agent,
         query: message,
         history,
-        conversationId: sessionId,
+        // IMPORTANT: pass the real conversation UUID, not the widget session id.
+        // Tools like request_human write conversation status updates by this id;
+        // using the raw session (often a legacy non-UUID string) made Postgres
+        // throw (22P02) and the agent reply with a fake "internal error" apology.
+        conversationId: conversation.id,
       });
     } else {
       result.content = "I've requested a human agent to assist you. They'll be with you shortly.";
@@ -142,12 +146,18 @@ export async function POST(request: NextRequest) {
     const messages = await (await import("@/lib/db/repositories/conversation.repo")).getConversationMessages(conversation.id);
     const humanMessages = messages.filter((m) => m.role === "assistant" && m.metadata?.sender === "human");
 
+    // Re-read the conversation status so a tool-driven handoff (e.g. the LLM
+    // calling request_human) is reflected back to the client instead of a stale
+    // "active" value.
+    const refreshed = await getConversationById(conversation.id);
+    const currentStatus = refreshed?.status ?? conversation.status;
+
     return NextResponse.json(
       {
         content: result.content,
         sources: result.sources,
         confidence: result.confidence,
-        status: handoffTriggered ? "human_required" : conversation.status,
+        status: handoffTriggered ? "human_required" : currentStatus,
         humanMessages: humanMessages.map((m) => ({
           id: m.id,
           content: m.content,

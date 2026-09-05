@@ -61,16 +61,30 @@ export async function POST(request: NextRequest) {
       conversationId,
     };
 
-    const result = await ragQuery(context);
-
-    // Best-effort persistence: never let a failed write break the chat reply.
+    // Resolve (or create) the conversation up-front so tools like request_human
+    // receive the real conversation UUID instead of the raw client session id —
+    // passing a non-UUID session id into a conversation-scoped tool made Postgres
+    // throw (22P02) and the agent fabricate an "internal error" apology.
+    let conversation: { id: string } | null = null;
     if (conversationId) {
       try {
-        const conversation = await getOrCreateSessionConversation({
+        conversation = await getOrCreateSessionConversation({
           sessionId: conversationId,
           workspace: agent.workspace,
           agent: agent.id,
         });
+      } catch (e) {
+        console.error("Failed to resolve conversation in /api/chat:", e);
+      }
+    }
+
+    context.conversationId = conversation?.id ?? conversationId;
+
+    const result = await ragQuery(context);
+
+    // Best-effort persistence: never let a failed write break the chat reply.
+    if (conversation) {
+      try {
         await createMessage({ conversation: conversation.id, role: "user", content: message });
         await createMessage({
           conversation: conversation.id,

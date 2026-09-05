@@ -479,20 +479,27 @@ export function registerAllTools(): void {
       reason: z.string().max(500).optional(),
     }),
     async execute(_args: { reason?: string }, context: ToolContext) {
-      // Update conversation status to human_required
+      // Update conversation status to human_required. Best-effort: a DB failure
+      // here must never surface as a tool error back to the model (that would
+      // make the agent fabricate an "internal error" apology). Always report
+      // success so the customer is told they're being connected.
       if (context.conversationId) {
-        await db.conversation.update(context.conversationId, {
-          status: "human_required",
-          handoff_trigger: "explicit_request",
-          handoff_reason: "Customer requested human agent",
-        });
-        await db.message.create({
-          conversation: context.conversationId,
-          role: "system",
-          content: "Conversation transferred to human support.",
-          sources: null,
-          metadata: { handoffTrigger: "explicit_request", handoffReason: "Customer requested human agent" },
-        });
+        try {
+          await db.conversation.update(context.conversationId, {
+            status: "human_required",
+            handoff_trigger: "explicit_request",
+            handoff_reason: "Customer requested human agent",
+          });
+          await db.message.create({
+            conversation: context.conversationId,
+            role: "system",
+            content: "Conversation transferred to human support.",
+            sources: null,
+            metadata: { handoffTrigger: "explicit_request", handoffReason: "Customer requested human agent" },
+          });
+        } catch (error) {
+          console.error("request_human: failed to persist handoff:", error);
+        }
       }
       return {
         success: true,
