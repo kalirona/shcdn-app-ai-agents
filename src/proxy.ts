@@ -6,7 +6,14 @@ import { hasSupabaseSessionCookie, isSupabaseSessionNearExpiry } from "@/lib/aut
 const PUBLIC_PATHS = ["/", "/auth", "/unauthorized", "/widget", "/a", "/api"];
 const AUTH_PATHS = ["/auth/v1/login", "/auth/v1/register", "/auth/v1/forgot-password"];
 
+// Static assets (incl. the public /embed.js and other files in /public) that must
+// never be gated by auth. Next's matcher cannot express alternation (no capturing
+// groups allowed), so we extend the public-path rule here instead.
+const STATIC_ASSET_RE = /\.(js|mjs|cjs|css|svg|ico|png|jpg|jpeg|gif|webp|map|json|txt|xml|woff2?|ttf|otf|eot|wasm|mp4|pdf)$/i;
+
 function isPublicPath(pathname: string): boolean {
+  // Never gate static assets (embed.js, favicon, images, fonts, etc.).
+  if (STATIC_ASSET_RE.test(pathname)) return true;
   return PUBLIC_PATHS.some((p) => {
     if (p === "/") {
       return pathname === "/";
@@ -73,5 +80,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.png$).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };
